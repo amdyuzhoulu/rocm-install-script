@@ -1574,7 +1574,7 @@ remove_existing_amdgpu_dkms() {
     [[ $detection_status -eq 1 ]] || return "$detection_status"
 }
 
-configure_amdgpu_3140_repository() {
+configure_amdgpu_repository() {
     local os_key=${INSTALL_PLAN[os_key]:-} codename source_line
 
     case "$os_key" in
@@ -1626,7 +1626,7 @@ migrate_driver() {
                 return 0
             fi
             [[ $detection_status -eq 1 ]] || remove_existing_amdgpu_dkms || return $?
-            configure_amdgpu_3140_repository || return $?
+            configure_amdgpu_repository || return $?
             install_amdgpu_current || return $?
             detect_existing_amdgpu_dkms || return $?
             amdgpu_dkms_is_clean_current || return 1
