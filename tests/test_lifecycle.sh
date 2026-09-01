@@ -14,8 +14,8 @@ MOCK_AMD_SMI_OUTPUT="ROCm version: 10.0.0"
 MOCK_INSTALLED_ROCM_PACKAGES=""
 MOCK_INSTALLED_LEGACY_ROCM_PACKAGES=""
 MOCK_KERNEL_METAPACKAGE_INSTALLED=""
-MOCK_KERNEL_CANDIDATE='6.14.0.1020.20'
-MOCK_KERNEL_SIMULATION_OUTPUT='Inst linux-oem-6.14 [6.14.0.1020.20]'
+MOCK_KERNEL_CANDIDATE='6.17.0.23.24.04'
+MOCK_KERNEL_SIMULATION_OUTPUT='Inst linux-generic-hwe-24.04 [6.17.0.23.24.04]'
 MOCK_KERNEL_DF_OUTPUT=$'Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/mock 1048576 1 1048575 1% /boot'
 
 lifecycle_run_cmd() {
@@ -49,8 +49,8 @@ capture_cmd() {
         */bin/rocminfo) printf '%s\n' "$MOCK_ROCMINFO_OUTPUT" ;;
         */bin/amd-smi\ version) printf '%s\n' "$MOCK_AMD_SMI_OUTPUT" ;;
         env\ LC_ALL=C\ df\ -Pk\ *) printf '%s\n' "$MOCK_KERNEL_DF_OUTPUT" ;;
-        env\ LC_ALL=C\ apt-cache\ policy\ linux-oem-6.14) printf 'Candidate: %s\n' "$MOCK_KERNEL_CANDIDATE" ;;
-        env\ LC_ALL=C\ apt-get\ --simulate\ --no-remove\ --install-recommends\ install\ linux-oem-6.14) printf '%s\n' "$MOCK_KERNEL_SIMULATION_OUTPUT" ;;
+        env\ LC_ALL=C\ apt-cache\ policy\ linux-generic-hwe-24.04) printf 'Candidate: %s\n' "$MOCK_KERNEL_CANDIDATE" ;;
+        env\ LC_ALL=C\ apt-get\ --simulate\ --no-remove\ --install-recommends\ install\ linux-generic-hwe-24.04) printf '%s\n' "$MOCK_KERNEL_SIMULATION_OUTPUT" ;;
         *) return 1 ;;
     esac
 }
@@ -68,14 +68,14 @@ reset_lifecycle_state() {
     MOCK_AMD_SMI_OUTPUT="ROCm version: 10.0.0"
     MOCK_INSTALLED_ROCM_PACKAGES=""
     MOCK_KERNEL_METAPACKAGE_INSTALLED=""
-    MOCK_KERNEL_CANDIDATE='6.14.0.1020.20'
-    MOCK_KERNEL_SIMULATION_OUTPUT='Inst linux-oem-6.14 [6.14.0.1020.20]'
+    MOCK_KERNEL_CANDIDATE='6.17.0.23.24.04'
+    MOCK_KERNEL_SIMULATION_OUTPUT='Inst linux-generic-hwe-24.04 [6.17.0.23.24.04]'
     MOCK_KERNEL_DF_OUTPUT=$'Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/mock 1048576 1 1048575 1% /boot'
     REBOOT_REQUIRED=false
     OS_ID=ubuntu
     OS_VERSION=24.04
     ARCH=x86_64
-    KERNEL_VERSION=6.14.0-1020-oem
+    KERNEL_VERSION=6.17.0-23-generic
     INSTALL_METHOD=apt
     GPU_ARCHES=gfx1151
     GPU_PRODUCT_NAMES='AMD Radeon 8060S Graphics'
@@ -87,8 +87,8 @@ reset_lifecycle_state() {
         [artifacts]=amdrocm-core-sdk10.0-gfx1151
         [driver_mode]=inbox
         [kernel_status]=ready
-        [kernel_target]='6.14.*-oem'
-        [kernel_package]=linux-oem-6.14
+        [kernel_target]='6.17.*-generic'
+        [kernel_package]=linux-generic-hwe-24.04
         [product_names]="$GPU_PRODUCT_NAMES"
     )
 }
@@ -112,7 +112,7 @@ os_release_fixture="${TEST_TEMP_ROOT}/os-release"
 printf 'ID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04.2 LTS"\n' > "$os_release_fixture"
 OS_RELEASE_FILE=$os_release_fixture
 SYSTEM_ARCH_OVERRIDE=x86_64
-SYSTEM_KERNEL_OVERRIDE=6.14.0-1020-oem
+SYSTEM_KERNEL_OVERRIDE=6.17.0-23-generic
 assert_success "Ubuntu 24.04 x86_64 is detected from os-release" detect_system
 assert_eq ubuntu "$OS_ID" "system detection records Ubuntu"
 assert_eq 24.04 "$OS_VERSION" "system detection records Ubuntu 24.04"
@@ -308,8 +308,8 @@ dpkg-query() {
         return 0
     fi
     case "${!#}" in
-        linux-oem-6.14)
-            [[ "$MOCK_KERNEL_METAPACKAGE_INSTALLED" == linux-oem-6.14 ]] || return 1
+        linux-generic-hwe-24.04)
+            [[ "$MOCK_KERNEL_METAPACKAGE_INSTALLED" == linux-generic-hwe-24.04 ]] || return 1
             printf '%s\n' installed
             ;;
         amdgpu-dkms)
@@ -354,10 +354,10 @@ lifecycle_run_cmd() {
         MOCK_DKMS_STATUS="amdgpu/6.19.18-2364437.24.04, ${MOCK_KERNEL_VERSION}, x86_64: installed"
         MOCK_REQUIRE_DRIVER_MIGRATION_BEFORE_APT=false
     fi
-    if [[ "$1 ${2:-} ${3:-} ${4:-} ${5:-} ${6:-}" == 'apt-get --yes --no-remove --install-recommends install linux-oem-6.14' ]]; then
-        MOCK_KERNEL_METAPACKAGE_INSTALLED=linux-oem-6.14
+    if [[ "$1 ${2:-} ${3:-} ${4:-} ${5:-} ${6:-}" == 'apt-get --yes --no-remove --install-recommends install linux-generic-hwe-24.04' ]]; then
+        MOCK_KERNEL_METAPACKAGE_INSTALLED=linux-generic-hwe-24.04
         mkdir -p "$KERNEL_BOOT_DIR"
-        printf 'kernel image\n' > "${KERNEL_BOOT_DIR}/vmlinuz-6.14.0-1020-oem"
+        printf 'kernel image\n' > "${KERNEL_BOOT_DIR}/vmlinuz-6.17.0-23-generic"
     fi
 }
 

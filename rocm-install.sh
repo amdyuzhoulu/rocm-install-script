@@ -236,7 +236,7 @@ kernel_policy_for() {
         ubuntu-24.04.4)
             if [[ "$has_ryzen_gfx" == true ]]; then
                 [[ "$has_non_ryzen_gfx" == false && "$driver_mode" == inbox ]] || return 1
-                printf '%s\n' '6.14.*-oem|linux-oem-6.14'
+                printf '%s\n' '6.17.*-generic|linux-generic-hwe-24.04'
             else
                 case "$driver_mode" in
                     inbox|dkms) printf '%s\n' '6.8.*-generic|linux-generic' ;;
@@ -259,7 +259,7 @@ kernel_release_matches_target() {
 
     [[ $# -eq 2 ]] || return 1
     case "$kernel_target" in
-        '6.14.*-oem') [[ "$kernel_release" =~ ^6\.14\.[0-9]+(-[[:alnum:].+_]+)*-oem$ ]] ;;
+        '6.17.*-generic') [[ "$kernel_release" =~ ^6\.17\.[0-9]+(-[[:alnum:].+_]+)*-generic$ ]] ;;
         '6.8.*-generic') [[ "$kernel_release" =~ ^6\.8\.[0-9]+(-[[:alnum:].+_]+)*-generic$ ]] ;;
         '7.0.*-generic') [[ "$kernel_release" =~ ^7\.0\.[0-9]+(-[[:alnum:].+_]+)*-generic$ ]] ;;
         *) return 1 ;;

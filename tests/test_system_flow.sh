@@ -7,7 +7,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 FLOW=""
 record_step() { FLOW+="$1"$'\n'; }
 require_root() { record_step root; }
-detect_system() { record_step system; OS_ID=ubuntu; OS_VERSION=24.04; ARCH=x86_64; KERNEL_VERSION=6.14.0-1020-oem; }
+detect_system() { record_step system; OS_ID=ubuntu; OS_VERSION=24.04; ARCH=x86_64; KERNEL_VERSION=6.17.0-23-generic; }
 resolve_gpu_identity() {
     [[ $# -eq 0 ]] || return 64
     GPU_ARCHES=$(normalize_gfxes "$GPU_ARCHES") || return $?
@@ -32,8 +32,8 @@ resolve_install_plan() {
         [driver_mode]="$(resolve_driver_mode "$DRIVER_MODE" ubuntu-24.04.4 "$gpu_classes" "$GPU_ARCHES")"
         [driver_status]=ready
         [kernel_status]=ready
-        [kernel_target]='6.14.*-oem'
-        [kernel_package]=linux-oem-6.14
+        [kernel_target]='6.17.*-generic'
+        [kernel_package]=linux-generic-hwe-24.04
         [product_names]="$GPU_PRODUCT_NAMES"
     )
     record_step plan
@@ -87,7 +87,7 @@ assert_contains "$MAIN_OUTPUT" "sudo" "root preflight tells users how to proceed
 assert_eq "root" "${FLOW%$'\n'}" "root preflight runs no later stage"
 
 require_root() { record_step root; }
-detect_system() { record_step system; OS_ID=debian; OS_VERSION=13; ARCH=x86_64; KERNEL_VERSION=6.14.0-1020-oem; return 29; }
+detect_system() { record_step system; OS_ID=debian; OS_VERSION=13; ARCH=x86_64; KERNEL_VERSION=6.17.0-23-generic; return 29; }
 FLOW=""
 assert_status 29 "system detection preserves its failure status" capture_main_output --gpu-arch gfx1151 --non-interactive --skip-reboot
 assert_contains "$MAIN_OUTPUT" "system detection" "system detection identifies the failed stage"
@@ -95,7 +95,7 @@ assert_contains "$MAIN_OUTPUT" "Ubuntu/x86_64" "system detection tells users the
 assert_contains "$MAIN_OUTPUT" "os=debian-13" "system detection reports detected host context"
 assert_eq $'root\nsystem' "${FLOW%$'\n'}" "system detection runs no mutation stage"
 
-detect_system() { record_step system; OS_ID=ubuntu; OS_VERSION=24.04; ARCH=x86_64; KERNEL_VERSION=6.14.0-1020-oem; }
+detect_system() { record_step system; OS_ID=ubuntu; OS_VERSION=24.04; ARCH=x86_64; KERNEL_VERSION=6.17.0-23-generic; }
 resolve_gpu_identity() { record_step gpu; return 31; }
 FLOW=""
 assert_status 31 "GPU preflight preserves its failure status" capture_main_output --gpu-arch gfx1151 --non-interactive --skip-reboot
@@ -116,7 +116,7 @@ FLOW=""
 assert_status 37 "plan validation preserves its failure status" capture_main_output --gpu-arch gfx1151 --non-interactive --skip-reboot
 assert_contains "$MAIN_OUTPUT" "installation plan validation" "plan validation identifies the failed stage"
 assert_contains "$MAIN_OUTPUT" "os=ubuntu-24.04" "plan validation reports operating-system context"
-assert_contains "$MAIN_OUTPUT" "kernel=6.14.0-1020-oem" "plan validation reports kernel context"
+assert_contains "$MAIN_OUTPUT" "kernel=6.17.0-23-generic" "plan validation reports kernel context"
 assert_contains "$MAIN_OUTPUT" "driver=auto" "plan validation reports driver context"
 assert_contains "$MAIN_OUTPUT" "gfx=gfx1151" "plan validation reports GPU context"
 assert_eq $'root\nsystem\ngpu:gfx1151\nplan' "${FLOW%$'\n'}" "plan validation runs no mutation stage"
@@ -137,8 +137,8 @@ resolve_install_plan() {
         [driver_mode]="$(resolve_driver_mode "$DRIVER_MODE" ubuntu-24.04.4 "$gpu_classes" "$GPU_ARCHES")"
         [driver_status]=ready
         [kernel_status]=ready
-        [kernel_target]='6.14.*-oem'
-        [kernel_package]=linux-oem-6.14
+        [kernel_target]='6.17.*-generic'
+        [kernel_package]=linux-generic-hwe-24.04
         [product_names]="$GPU_PRODUCT_NAMES"
     )
     record_step plan
@@ -175,8 +175,8 @@ resolve_install_plan() {
         [driver_mode]=inbox
         [driver_status]=ready
         [kernel_status]=install-required
-        [kernel_target]='6.14.*-oem'
-        [kernel_package]=linux-oem-6.14
+        [kernel_target]='6.17.*-generic'
+        [kernel_package]=linux-generic-hwe-24.04
         [product_names]="$GPU_PRODUCT_NAMES"
     )
     record_step plan
@@ -420,9 +420,9 @@ assert_eq inbox "$(resolve_driver_mode auto ubuntu-24.04.4 ryzen gfx1151)" "Ubun
 assert_eq dkms "$(resolve_driver_mode dkms ubuntu-24.04.4 radeon gfx1200)" "Ubuntu 24 Radeon accepts explicit DKMS"
 assert_fails "Ubuntu 24 Ryzen rejects explicit DKMS" resolve_driver_mode dkms ubuntu-24.04.4 ryzen gfx1151
 
-assert_eq '6.14.*-oem|linux-oem-6.14' "$(kernel_policy_for inbox ubuntu-24.04.4 gfx1151)" "Ubuntu 24 Ryzen targets select the approved OEM metapackage"
-assert_success "Ubuntu 24 Ryzen accepts the current OEM kernel release" validate_ubuntu_kernel inbox ubuntu-24.04.4 6.14.0-1020-oem gfx1151
-assert_fails "Ubuntu 24 Ryzen rejects a matching series with generic flavor" validate_ubuntu_kernel inbox ubuntu-24.04.4 6.14.0-1020-generic gfx1151
+assert_eq '6.17.*-generic|linux-generic-hwe-24.04' "$(kernel_policy_for inbox ubuntu-24.04.4 gfx1151)" "Ubuntu 24 Ryzen targets select the recommended HWE metapackage"
+assert_success "Ubuntu 24 Ryzen accepts the recommended HWE kernel release" validate_ubuntu_kernel inbox ubuntu-24.04.4 6.17.0-23-generic gfx1151
+assert_fails "Ubuntu 24 Ryzen rejects a matching series with OEM flavor" validate_ubuntu_kernel inbox ubuntu-24.04.4 6.17.0-23-oem gfx1151
 assert_fails "Ubuntu 24 Ryzen rejects DKMS mode" kernel_policy_for dkms ubuntu-24.04.4 gfx1151
 assert_fails "Ubuntu 24 mixed Ryzen and non-Ryzen targets fail closed" kernel_policy_for inbox ubuntu-24.04.4 $'gfx1151\ngfx1201'
 assert_eq '6.8.*-generic|linux-generic' "$(kernel_policy_for inbox ubuntu-24.04.4 gfx1201)" "Ubuntu 24 non-Ryzen targets select the GA generic metapackage"

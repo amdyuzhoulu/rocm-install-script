@@ -69,6 +69,7 @@ The script never installs a kernel, changes GRUB, selects a boot entry, or reboo
 - Kernel 6.8 or newer: installation may continue.
 - A non-recommended kernel prints the current kernel and AMD's recommended kernel but does not require a switch.
 - Radeon AI PRO R9700 on Ubuntu 24.04.4: AMD's compatibility matrix recommends the GA 6.8 kernel. A running 6.17 kernel therefore receives a warning and is allowed to continue.
+- Ryzen AI Max `gfx1151` systems such as Radeon 8060S on Ubuntu 24.04.4: ROCm 10 recommends the HWE 6.17 generic kernel. A running 6.14 OEM kernel receives a warning and remains allowed.
 - When driver activation requires a reboot, the installer reports the boundary and exits. The user reboots manually and reruns the script.
 
 The removed ROCm 7.14 options `--prepare-kernel`, `--reboot-after-kernel`, and `--allow-unqualified-kernel` are rejected.
