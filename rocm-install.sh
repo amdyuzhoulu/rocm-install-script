@@ -10,8 +10,8 @@ ROCM_VERSION=10.0.0
 ROCM_SERIES=10.0
 AMDGPU_RELEASE=31.50
 AMDGPU_BUILD_ID=31500000
-ROCM_PACKAGES_ROOT=https://repo.amd.com/rocm/packages-multi-arch
-ROCM_GPG_KEY_URL=${ROCM_PACKAGES_ROOT}/gpg/rocm.gpg
+ROCM_PACKAGES_ROOT=https://stable.repo.amd.com/rocm/core/packages
+ROCM_GPG_KEY_URL=https://stable.repo.amd.com/rocm/gpg/packages.gpg
 ROCM_GPU_LOOKUP_URL='https://rocm.docs.amd.com/en/latest/install/rocm.html?fam=all&w=compute&os=ubuntu&ubuntu-ver=24.04&i=runfile'
 ROCM_GPU_LOOKUP_ZH_URL='https://github.com/amdjiahangpan/hello-rocm/blob/master/docs/zh/00-environment/rocm-gpu-architecture-table.md'
 ROCM_RUNFILE_NAME=rocm-installer-10.0.0-4.run

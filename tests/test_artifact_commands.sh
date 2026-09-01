@@ -16,8 +16,7 @@ assert_command_output_eq() {
 
 assert_command_output_eq "apt|ubuntu2404" "Ubuntu 24.04 uses the multi-arch APT repository" resolve_os_record ubuntu-24.04.4
 assert_command_output_eq "apt|ubuntu2604" "Ubuntu 26.04 uses the multi-arch APT repository" resolve_os_record ubuntu-26.04
-assert_eq "https://repo.amd.com/rocm/packages-multi-arch/ubuntu2404" "${ROCM_PACKAGES_ROOT}/ubuntu2404" "Ubuntu 24.04 repository URL is exact"
-
+assert_eq "https://stable.repo.amd.com/rocm/core/packages/ubuntu2404" "${ROCM_PACKAGES_ROOT}/ubuntu2404" "Ubuntu 24.04 repository URL is exact"
 supported_gfxes=$'gfx1030\ngfx1100\ngfx1101\ngfx1102\ngfx1103\ngfx1150\ngfx1151\ngfx1152\ngfx1153\ngfx1200\ngfx1201\ngfx908\ngfx90a\ngfx942\ngfx950'
 while IFS= read -r gfx; do
     assert_command_output_eq "amdrocm10.0-${gfx}" "${gfx} selects the ROCm 10 meta package" resolve_package_name full "$gfx"

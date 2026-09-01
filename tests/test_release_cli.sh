@@ -37,7 +37,7 @@ run_invalid_option() {
 assert_eq "10.0.0" "$ROCM_VERSION" "release is fixed at ROCm 10.0.0"
 assert_eq "10.0" "$ROCM_SERIES" "package series is fixed at 10.0"
 assert_eq "31.50" "$AMDGPU_RELEASE" "AMDGPU migration release is fixed at 31.50"
-assert_eq "https://repo.amd.com/rocm/packages-multi-arch" "$ROCM_PACKAGES_ROOT" "APT package root is fixed"
+assert_eq "https://stable.repo.amd.com/rocm/core/packages" "$ROCM_PACKAGES_ROOT" "APT package root is fixed"
 assert_eq "https://rocm.docs.amd.com/en/latest/install/rocm.html?fam=all&w=compute&os=ubuntu&ubuntu-ver=24.04&i=runfile" "$ROCM_GPU_LOOKUP_URL" "official GPU lookup URL is fixed"
 assert_eq "https://github.com/amdjiahangpan/hello-rocm/blob/master/docs/zh/00-environment/rocm-gpu-architecture-table.md" "$ROCM_GPU_LOOKUP_ZH_URL" "Chinese GPU lookup URL is fixed"
 assert_eq "https://repo.radeon.com/rocm/installer/rocm-runfile-installer/rocm-rel-10.0/rocm-installer-10.0.0-4.run" "$ROCM_RUNFILE_URL" "official ROCm 10 Runfile URL is fixed"
