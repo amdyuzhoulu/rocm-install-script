@@ -5,20 +5,17 @@ if [[ "${ROCM_INSTALL_LIBRARY_MODE:-}" != 1 ]]; then
     set -euo pipefail
 fi
 
-SCRIPT_VERSION=3.0.0
-ROCM_VERSION=7.14.0
-ROCM_SERIES=7.14
-AMDGPU_RELEASE=31.40
-AMDGPU_BUILD_ID=31400000
+SCRIPT_VERSION=4.0.0
+ROCM_VERSION=10.0.0
+ROCM_SERIES=10.0
+AMDGPU_RELEASE=31.50
+AMDGPU_BUILD_ID=31500000
 ROCM_PACKAGES_ROOT=https://repo.amd.com/rocm/packages-multi-arch
 ROCM_GPG_KEY_URL=${ROCM_PACKAGES_ROOT}/gpg/rocm.gpg
-ROCM_WHL_INDEX=https://repo.amd.com/rocm/whl-multi-arch/
-ROCM_TARBALL_ROOT=https://repo.amd.com/rocm/tarball-multi-arch/
-ROCM_MULTIARCH_TARBALL_ARTIFACT=therock-dist-linux-multiarch-7.14.0.tar.gz
 ROCM_GPU_LOOKUP_URL='https://rocm.docs.amd.com/en/latest/install/rocm.html?fam=all&w=compute&os=ubuntu&ubuntu-ver=24.04&i=runfile'
 ROCM_GPU_LOOKUP_ZH_URL='https://github.com/amdjiahangpan/hello-rocm/blob/master/docs/zh/00-environment/rocm-gpu-architecture-table.md'
-ROCM_RUNFILE_NAME=rocm-installer-7.14.0-7.run
-ROCM_RUNFILE_URL="https://repo.radeon.com/rocm/installer/rocm-runfile-installer/rocm-rel-7.14/${ROCM_RUNFILE_NAME}"
+ROCM_RUNFILE_NAME=rocm-installer-10.0.0-4.run
+ROCM_RUNFILE_URL="https://repo.radeon.com/rocm/installer/rocm-runfile-installer/rocm-rel-10.0/${ROCM_RUNFILE_NAME}"
 AMDGPU_REPOSITORY=https://repo.radeon.com/amdgpu/${AMDGPU_RELEASE}/ubuntu
 AMDGPU_GPG_KEY_URL=https://repo.radeon.com/rocm/rocm.gpg.key
 SUPPORTED_OS_KEYS=ubuntu-24.04.4,ubuntu-26.04
@@ -185,7 +182,7 @@ resolve_package_name() {
     validate_artifact_gfx "$gfx" || return 1
     record=${ROCM_714_ARTIFACT_RECORDS[$gfx]}
     IFS='|' read -r package_suffix _ _ <<< "$record"
-    printf 'amdrocm-core-sdk%s-%s\n' "$ROCM_SERIES" "$package_suffix"
+    printf 'amdrocm%s-%s\n' "$ROCM_SERIES" "$package_suffix"
 }
 
 resolve_pip_requirement() {
@@ -822,8 +819,6 @@ resolve_plan_artifacts() {
                 resolve_package_name full "$gfx" || return $?
             done <<< "$normalized_gfxes"
             ;;
-        pip) resolve_pip_requirement "$normalized_gfxes" ;;
-        tarball) resolve_tarball_artifact "$normalized_gfxes" ;;
         runfile) printf '%s\n' "$ROCM_RUNFILE_URL" ;;
         *) return 1 ;;
     esac
@@ -904,7 +899,7 @@ resolve_install_plan() {
     [[ "${SKIP_SSH:-}" == true || "${SKIP_SSH:-}" == false ]] || return 1
     [[ "${DKMS_CLEANUP_POLICY:-}" == auto || "${DKMS_CLEANUP_POLICY:-}" == ask || "${DKMS_CLEANUP_POLICY:-}" == always || "${DKMS_CLEANUP_POLICY:-}" == never ]] || return 1
     [[ "${ROOT_PASSWORD:-}" != *$'\n'* && "${ROOT_PASSWORD:-}" != *$'\r'* ]] || return 1
-    case "${INSTALL_METHOD:-}" in apt|pip|tarball|runfile) ;; *) return 1 ;; esac
+    case "${INSTALL_METHOD:-}" in apt|runfile) ;; *) return 1 ;; esac
     os_key=$(normalize_os_key "$OS_ID" "${OS_VERSION:-}") || return 1
     os_description=${OS_DESCRIPTION:-"${OS_ID} ${OS_VERSION:-unknown}"}
     [[ -n "$os_description" && "$os_description" != *$'\n'* && "$os_description" != *$'\r'* ]] || return 1
@@ -989,7 +984,7 @@ print_install_plan() {
     output+="kernel_status=${INSTALL_PLAN[kernel_status]}"$'\n'
     output+="support_status=${INSTALL_PLAN[support_status]}"$'\n'
     if [[ "${INSTALL_PLAN[support_status]}" == unqualified ]]; then
-        output+="warning=UNQUALIFIED: ROCm 7.14.0 lists Ubuntu 24.04 R9700 with kernel 6.8, not this 6.17 kernel"$'\n'
+        output+="warning=ROCm ${ROCM_VERSION} recommends kernel ${INSTALL_PLAN[kernel_target]} for this host; current=${KERNEL_VERSION:-unknown}; installation may continue"$'\n'
     fi
     output+="kernel_target=${INSTALL_PLAN[kernel_target]}"$'\n'
     output+="kernel_package=${INSTALL_PLAN[kernel_package]}"$'\n'
@@ -1028,7 +1023,7 @@ require_root() {
 }
 
 verify_installation() {
-    local install_root rocminfo_output amd_smi_output requested_records requested_gfxes visible_gfxes requested_gfx visible_gfx found
+    local install_root rocminfo_output amd_smi_output requested_records requested_gfxes visible_gfxes requested_gfx visible_gfx found version_pattern
 
     if [[ "${REBOOT_REQUIRED:-false}" == true ]]; then
         printf '%s\n' 'ROCm installation is pending reboot; verification has not been run.'
@@ -1062,11 +1057,12 @@ verify_installation() {
             return 1
         fi
     done <<< "$requested_gfxes"
-    [[ "$amd_smi_output" =~ (^|[^0-9.])7\.14\.0([^0-9.]|$) ]] || {
-        printf '%s\n' 'ROCm verification failed: expected version 7.14.0.' >&2
+    version_pattern="(^|[^0-9.])${ROCM_VERSION//./\\.}([^0-9.]|$)"
+    [[ "$amd_smi_output" =~ $version_pattern ]] || {
+        printf 'ROCm verification failed: expected version %s.\n' "$ROCM_VERSION" >&2
         return 1
     }
-    printf '%s\n' 'ROCm 7.14.0 verified for requested gfx agents with rocminfo and amd-smi.'
+    printf 'ROCm %s verified for requested gfx agents with rocminfo and amd-smi.\n' "$ROCM_VERSION"
 }
 
 run_cmd() {
@@ -1167,25 +1163,23 @@ r9700_identity_is_verified() {
 
 resolve_kernel_support_record() {
     local driver_mode=${1:-} os_key=${2:-} gpu_classes=${3:-} gfxes=${4:-} gpu_count=${5:-}
-    local unmapped_pci=${6:-} kernel_release=${7:-} kernel_target=${8:-} kernel_package=${9:-} kernel_status
+    local unmapped_pci=${6:-} kernel_release=${7:-} kernel_target=${8:-} kernel_package=${9:-} kernel_status major minor
 
     [[ $# -eq 9 ]] || return 1
     [[ "$(resolve_gpu_classes "$gfxes")" == "$gpu_classes" ]] || return 1
+    [[ "$kernel_release" =~ ^([0-9]+)\.([0-9]+)\. ]] || return 1
+    major=${BASH_REMATCH[1]}
+    minor=${BASH_REMATCH[2]}
+    if ((major < 6 || (major == 6 && minor < 8))); then
+        printf '%s\n' 'install-required|qualified'
+        return 0
+    fi
     kernel_status=$(resolve_kernel_status "$kernel_target" "$kernel_package" "$kernel_release") || return $?
     if [[ "$kernel_status" == ready ]]; then
         printf '%s\n' 'ready|qualified'
-        return 0
-    fi
-    if [[ "${ALLOW_UNQUALIFIED_KERNEL:-false}" == true \
-        && "$os_key" == ubuntu-24.04.4 \
-        && "$gpu_classes" == radeon \
-        && "$driver_mode" == dkms \
-        && "$kernel_release" =~ ^6\.17\.[0-9]+(-[[:alnum:].+_]+)*-generic$ ]] \
-        && r9700_identity_is_verified "$gfxes" "$gpu_count" "$unmapped_pci"; then
+    else
         printf '%s\n' 'ready-unqualified|unqualified'
-        return 0
     fi
-    printf '%s|%s\n' "$kernel_status" qualified
 }
 
 kernel_boot_has_minimum_free_space() {
@@ -1634,16 +1628,16 @@ runfile_state_path() {
     local state_root=${ROCM_RUNFILE_STATE_ROOT:-/var/lib/rocm-installer}
 
     [[ "$state_root" == /* ]] || return 1
-    printf '%s/runfile-7.14-all\n' "${state_root%/}"
+    printf '%s/runfile-10.0-all\n' "${state_root%/}"
 }
 runfile_layout_exists() {
-    local install_root=${ROCM_RUNFILE_ROOT:-/opt/rocm/core-7.14.0}
+    local install_root=${ROCM_RUNFILE_ROOT:-/opt/rocm/core-10.0.0}
     [[ -e "$install_root" ]]
 }
 
 
 runfile_layout_is_ready() {
-    local install_root=${ROCM_RUNFILE_ROOT:-/opt/rocm/core-7.14.0}
+    local install_root=${ROCM_RUNFILE_ROOT:-/opt/rocm/core-10.0.0}
 
     [[ -x "$install_root/bin/rocminfo" && -x "$install_root/bin/amd-smi" ]]
 }
@@ -1709,7 +1703,7 @@ mark_runfile_installation() {
 
     state_path=$(runfile_state_path) || return 1
     install -d -m 0700 "$state_root" || return $?
-    temporary=$(mktemp "${state_root%/}/.runfile-7.14-all.XXXXXX") || return $?
+    temporary=$(mktemp "${state_root%/}/.runfile-10.0-all.XXXXXX") || return $?
     if printf 'version=%s\ngfx=all\nurl=%s\n' "$ROCM_VERSION" "$ROCM_RUNFILE_URL" > "$temporary" \
         && chmod 0600 "$temporary" \
         && mv -f "$temporary" "$state_path"; then
@@ -1745,11 +1739,9 @@ detect_installed_amdrocm_packages() {
 
 validate_rocm_layout_compatibility() {
     local intended_method=${1:-} state_path amdrocm_packages legacy_packages
-    local pip_root=${ROCM_PIP_ROOT:-/opt/rocm-${ROCM_VERSION}-venv}
-    local tarball_root=${ROCM_TARBALL_INSTALL_ROOT:-/opt/rocm-${ROCM_VERSION}}
 
     [[ $# -eq 1 ]] || return 1
-    case "$intended_method" in apt|pip|tarball|runfile) ;; *) return 1 ;; esac
+    case "$intended_method" in apt|runfile) ;; *) return 1 ;; esac
     state_path=$(runfile_state_path) || return 1
     if [[ "$intended_method" != runfile ]]; then
         if [[ -e "$state_path" ]] || runfile_layout_exists; then
@@ -1764,8 +1756,6 @@ validate_rocm_layout_compatibility() {
         printf 'Runfile installation refused: package-manager ROCm packages are installed.\n' >&2
         return 1
     fi
-    [[ ! -e "$pip_root" ]] || { printf 'Runfile installation refused: pip layout exists at %s.\n' "$pip_root" >&2; return 1; }
-    [[ ! -e "$tarball_root" ]] || { printf 'Runfile installation refused: tarball layout exists at %s.\n' "$tarball_root" >&2; return 1; }
     if [[ -e "$state_path" ]]; then
         runfile_installation_is_ready || { printf '%s\n' 'Runfile registration is stale or incomplete.' >&2; return 1; }
     elif runfile_layout_exists; then
@@ -1867,7 +1857,7 @@ amdgpu_dkms_is_clean_3140() {
     package_version=${AMDGPU_DKMS_PACKAGE_VERSION#*:}
     firmware_version=${AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION#*:}
     package_pattern="^([0-9]+\\.[0-9]+\\.[0-9]+)\\.${AMDGPU_BUILD_ID}-(.+)$"
-    firmware_pattern="^31\\.40\\.0\\.0\\.${AMDGPU_BUILD_ID}-(.+)$"
+    firmware_pattern="^${AMDGPU_RELEASE//./\\.}\\.0\\.0\\.${AMDGPU_BUILD_ID}-(.+)$"
     [[ "$package_version" =~ $package_pattern ]] || return 1
     driver_base=${BASH_REMATCH[1]}
     build_suffix=${BASH_REMATCH[2]}
@@ -2192,10 +2182,8 @@ user_has_required_groups() {
 
 rocm_install_root() {
     case "${INSTALL_PLAN[method]:-${INSTALL_METHOD:-}}" in
-        apt) printf '%s\n' /opt/rocm/core-7.14 ;;
-        runfile) printf '%s\n' "${ROCM_RUNFILE_ROOT:-/opt/rocm/core-7.14.0}" ;;
-        pip) printf '/opt/rocm-%s-venv\n' "$ROCM_VERSION" ;;
-        tarball) printf '%s\n' /opt/rocm ;;
+        apt) printf '%s\n' /opt/rocm/core-10.0 ;;
+        runfile) printf '%s\n' "${ROCM_RUNFILE_ROOT:-/opt/rocm/core-10.0.0}" ;;
         *) return 1 ;;
     esac
 }
@@ -2292,7 +2280,7 @@ find_interrupted_rocm_layout_candidate() {
     local active_root=${1:-/opt/rocm} candidate found=""
 
     for candidate in "${active_root}-"*; do
-        [[ -d "$candidate" && ! -L "$candidate" && -d "$candidate/core-7.14" ]] || continue
+        [[ -d "$candidate" && ! -L "$candidate" && -d "$candidate/core-10.0" ]] || continue
         [[ -z "$found" ]] || return 2
         found=$candidate
     done
@@ -2320,7 +2308,7 @@ repair_legacy_rocm_layout() {
 rocm_apt_verification_root_exists() {
     local active_root=${1:-/opt/rocm}
 
-    [[ -d "$active_root/core-7.14" ]]
+    [[ -d "$active_root/core-10.0" ]]
 }
 
 cleanup_managed_rocm_environment() {
@@ -2334,11 +2322,11 @@ do_uninstall_runfile() {
 
     state_path=$(runfile_state_path) || return 1
     [[ -f "$state_path" ]] || {
-        printf '%s\n' 'Runfile uninstall refused: no registered ROCm 7.14 Runfile installation was found.' >&2
+        printf '%s\n' 'Runfile uninstall refused: no registered ROCm 10.0 Runfile installation was found.' >&2
         return 1
     }
     if [[ "${NON_INTERACTIVE:-false}" != true ]]; then
-        read -r -p 'Remove the ROCm 7.14 Runfile installation? [y/N] ' answer || return 1
+        read -r -p 'Remove the ROCm 10.0 Runfile installation? [y/N] ' answer || return 1
         [[ "$answer" == y || "$answer" == Y || "$answer" == yes || "$answer" == YES ]] || return 1
     fi
     temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/rocm-runfile-uninstall.XXXXXX") || return $?
@@ -2365,7 +2353,7 @@ do_uninstall_runfile() {
     }
     run_cmd rm -f "$state_path" || return $?
     run_cmd rm -rf "$temp_dir" || return $?
-    printf '%s\n' 'ROCm 7.14.0 Runfile installation removed; AMDGPU driver was left installed.'
+    printf '%s\n' 'ROCm 10.0.0 Runfile installation removed; AMDGPU driver was left installed.'
 }
 
 do_uninstall() {
@@ -2383,7 +2371,7 @@ do_uninstall() {
     fi
 
     if [[ "${NON_INTERACTIVE:-false}" != true ]]; then
-        read -r -p 'Remove ROCm 7.14.0? [y/N] ' output || return 1
+        read -r -p 'Remove ROCm 10.0.0? [y/N] ' output || return 1
         [[ "$output" == y || "$output" == Y || "$output" == yes || "$output" == YES ]] || return 1
     fi
     output=$(rocm_apt_installed_package_candidates) || return $?
@@ -2397,7 +2385,7 @@ do_uninstall() {
             failure_status=$?
         fi
     fi
-    if run_cmd rm -rf /opt/rocm/core-7.14 "/opt/rocm-${ROCM_VERSION}" "/opt/rocm-${ROCM_VERSION}-venv"; then
+    if run_cmd rm -rf /opt/rocm/core-10.0 "/opt/rocm-${ROCM_VERSION}"; then
         :
     else
         command_status=$?
@@ -2445,7 +2433,7 @@ do_uninstall() {
         fi
     fi
     if ((failure_status == 0)); then
-        printf '%s\n' 'ROCm 7.14.0 removed; amdgpu-dkms was left installed.'
+        printf '%s\n' 'ROCm 10.0.0 removed; amdgpu-dkms was left installed.'
     else
         printf '%s\n' 'ROCm cleanup completed with errors; amdgpu-dkms was left installed.' >&2
     fi
@@ -2471,21 +2459,18 @@ confirm_install_plan() {
 
 show_help() {
     cat <<EOF
-ROCm 7.14.0 Installer v${SCRIPT_VERSION}
+ROCm ${ROCM_VERSION} Installer v${SCRIPT_VERSION}
 
 Usage: sudo $0 [options]
 
 Options:
-  --method METHOD          Installation method: apt, pip, tarball, or runfile
+  --method METHOD          Installation method: apt or runfile
   --gpu-arch ARCH          Override automatic GFX detection; may be repeated
   --driver-mode MODE       Driver mode: auto, inbox, or dkms
   --skip-ssh               Skip SSH setup
   --root-password PASS     Set the root password during installation
-  --skip-reboot            Skip reboot after installation
-  --reboot-delay MIN       Delay reboot for 0 to 120 minutes
-  --prepare-kernel         Install the reviewed kernel when it is not running
-  --reboot-after-kernel    Select the reviewed kernel for one reboot attempt
-  --allow-unqualified-kernel  Allow Ubuntu 24.04 R9700 DKMS on 6.17 generic; unsupported
+  --skip-reboot            Retained for compatibility; the installer never reboots
+  --reboot-delay MIN       Retained for compatibility; the installer never reboots
   --verify-only            Verify an existing installation
   --uninstall              Remove an existing installation
   --non-interactive        Run without prompts
@@ -2510,7 +2495,7 @@ parse_args() {
         case "$1" in
             --method)
                 require_option_value "$1" "${2:-}" || return 1
-                case "$2" in apt|pip|tarball|runfile) INSTALL_METHOD=$2 ;; *) return 1 ;; esac
+                case "$2" in apt|runfile) INSTALL_METHOD=$2 ;; *) return 1 ;; esac
                 shift 2
                 ;;
             --gpu-arch)
@@ -2544,18 +2529,6 @@ parse_args() {
                 REBOOT_DELAY=$2
                 shift 2
                 ;;
-            --prepare-kernel)
-                PREPARE_KERNEL=true
-                shift
-                ;;
-            --reboot-after-kernel)
-                REBOOT_AFTER_KERNEL=true
-                shift
-                ;;
-            --allow-unqualified-kernel)
-                ALLOW_UNQUALIFIED_KERNEL=true
-                shift
-                ;;
             --verify-only)
                 VERIFY_ONLY=true
                 shift
@@ -2581,10 +2554,6 @@ parse_args() {
         esac
     done
     [[ "$VERIFY_ONLY" != true || "$UNINSTALL" != true ]] || return 1
-    [[ "$REBOOT_AFTER_KERNEL" != true || "$PREPARE_KERNEL" == true ]] || return 1
-    [[ "$PREPARE_KERNEL" != true || ( "$VERIFY_ONLY" != true && "$UNINSTALL" != true ) ]] || return 1
-    [[ "$ALLOW_UNQUALIFIED_KERNEL" != true || ( "$PREPARE_KERNEL" != true && "$REBOOT_AFTER_KERNEL" != true ) ]] || return 1
-    [[ "$ALLOW_UNQUALIFIED_KERNEL" != true || ( "$VERIFY_ONLY" != true && "$UNINSTALL" != true ) ]] || return 1
     if [[ "$GPU_ARCHES" == all || "$GPU_ARCHES" == *$'\n'all || "$GPU_ARCHES" == all$'\n'* || "$GPU_ARCHES" == *$'\n'all$'\n'* ]]; then
         [[ "$GPU_ARCHES" == all && "$INSTALL_METHOD" == runfile ]] || return 1
     fi
@@ -2613,14 +2582,10 @@ run_stage() {
 }
 
 report_kernel_action_required() {
-    printf 'ROCm kernel action required: current kernel=%s, target kernel=%s, package=%s. Re-run with --prepare-kernel to install the reviewed kernel.\n' \
-        "${KERNEL_VERSION:-unknown}" "${INSTALL_PLAN[kernel_target]:-unknown}" "${INSTALL_PLAN[kernel_package]:-unknown}" >&2
+    printf 'ROCm requires Linux kernel 6.8 or newer: current=%s. Upgrade the kernel manually, reboot into it, then rerun this installer; no kernel or bootloader changes were made.\n' \
+        "${KERNEL_VERSION:-unknown}" >&2
 }
 
-report_kernel_reboot_required() {
-    printf 'ROCm kernel reboot required: current kernel=%s, target kernel=%s, package=%s. Select the target kernel, reboot, verify uname -r, and run the installer again.\n' \
-        "${KERNEL_VERSION:-unknown}" "${INSTALL_PLAN[kernel_target]:-unknown}" "${INSTALL_PLAN[kernel_package]:-unknown}" >&2
-}
 
 
 report_driver_runtime_failed() {
@@ -2635,7 +2600,6 @@ report_driver_activation_required() {
 
 stop_for_driver_activation() {
     report_driver_activation_required
-    run_stage 'driver activation reboot' handle_reboot || return $?
     return "$EXIT_DRIVER_REBOOT_REQUIRED"
 }
 main() {
@@ -2665,7 +2629,6 @@ main() {
         do_uninstall
         return $?
     fi
-    reconcile_pending_kernel_state || return $?
     resolve_gpu_identity || {
         status=$?
         preflight_error 'GPU/KFD discovery' 'check the KFD topology or provide a supported --gpu-arch value.'
@@ -2693,16 +2656,8 @@ main() {
     }
     run_stage 'installation plan revalidation' validate_install_plan || return $?
     if [[ "${INSTALL_PLAN[kernel_status]}" != ready && "${INSTALL_PLAN[kernel_status]}" != ready-unqualified ]]; then
-        if [[ "$PREPARE_KERNEL" != true ]]; then
-            report_kernel_action_required
-            return "$EXIT_KERNEL_ACTION_REQUIRED"
-        fi
-        run_stage 'kernel preparation' prepare_approved_kernel || return $?
-        if [[ "$REBOOT_AFTER_KERNEL" == true ]]; then
-            prepare_kernel_reboot || return $?
-        fi
-        report_kernel_reboot_required
-        return "$EXIT_KERNEL_REBOOT_REQUIRED"
+        report_kernel_action_required
+        return "$EXIT_KERNEL_ACTION_REQUIRED"
     fi
     case "${INSTALL_PLAN[driver_status]}" in
         runtime-failed)
@@ -2725,7 +2680,7 @@ main() {
     run_stage 'environment configuration' step_configure_env || return $?
     run_stage 'ROCm verification' verify_installation || return $?
     if [[ "$REBOOT_REQUIRED" == true ]]; then
-        run_stage 'post-install reboot' handle_reboot || return $?
+        printf '%s\n' 'ROCm installation completed, but activation may require a user-controlled reboot. This installer will not reboot automatically.' >&2
     fi
 }
 

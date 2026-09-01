@@ -185,16 +185,11 @@ confirm_install_plan() { record_step confirm; }
 prepare_approved_kernel() { fail "default kernel mismatch must not prepare a kernel"; }
 handle_reboot() { fail "default kernel mismatch must not reboot"; }
 FLOW=""
-assert_status 20 "default kernel mismatch requires explicit action" capture_main_output --gpu-arch gfx1151 --non-interactive --skip-reboot
-assert_contains "$MAIN_OUTPUT" "current kernel" "kernel mismatch reports the running kernel"
-assert_contains "$MAIN_OUTPUT" "6.14.*-oem" "kernel mismatch reports the target kernel"
-assert_contains "$MAIN_OUTPUT" "linux-oem-6.14" "kernel mismatch reports the approved metapackage"
-assert_eq $'root\nsystem\ngpu:gfx1151\nplan\nprint-plan\nconfirm' "${FLOW%$'\n'}" "default mismatch stops before every mutation"
-
-prepare_approved_kernel() { record_step "kernel:${INSTALL_PLAN[kernel_status]}"; }
-FLOW=""
-assert_status 21 "explicit kernel preparation reports pending reboot" capture_main_output --gpu-arch gfx1151 --prepare-kernel --non-interactive --skip-reboot
-assert_eq $'root\nsystem\ngpu:gfx1151\nplan\nprint-plan\nconfirm\nkernel:install-required' "${FLOW%$'\n'}" "explicit preparation stops after preparing the target kernel"
+assert_status 20 "kernel below 6.8 requires manual upgrade" capture_main_output --gpu-arch gfx1151 --non-interactive --skip-reboot
+assert_contains "$MAIN_OUTPUT" "6.8 or newer" "old kernel reports the minimum"
+assert_contains "$MAIN_OUTPUT" "no kernel or bootloader changes" "old kernel explains the safety boundary"
+assert_eq $'root\nsystem\ngpu:gfx1151\nplan\nprint-plan\nconfirm' "${FLOW%$'\n'}" "old kernel stops before every mutation"
+assert_fails "removed kernel preparation option is rejected" capture_main_output --gpu-arch gfx1151 --prepare-kernel --non-interactive
 
 resolve_install_plan() {
     INSTALL_PLAN=([kernel_status]=ready-unqualified [support_status]=unqualified [driver_mode]=dkms [driver_status]=ready [method]=apt)
@@ -202,7 +197,7 @@ resolve_install_plan() {
 }
 step_install_driver() { record_step driver; return 47; }
 FLOW=""
-assert_status 47 "unqualified-ready kernel proceeds to driver migration" capture_main_output --gpu-arch gfx1201 --allow-unqualified-kernel --non-interactive --skip-reboot
+assert_status 47 "advisory newer kernel proceeds to driver migration" capture_main_output --gpu-arch gfx1201 --non-interactive --skip-reboot
 assert_contains "$MAIN_OUTPUT" "driver migration" "unqualified-ready driver failure identifies the failed stage"
 assert_contains "$MAIN_OUTPUT" "status=47" "unqualified-ready driver failure preserves its status"
 assert_eq $'root\nsystem\ngpu:gfx1201\nplan\nprint-plan\nconfirm\ndriver' "${FLOW%$'\n'}" "unqualified-ready kernel skips kernel mutation and reaches driver migration"
@@ -212,11 +207,11 @@ resolve_install_plan() {
     record_step plan
 }
 step_install_driver() { fail "pending driver activation must stop before migration"; }
-handle_reboot() { record_step reboot; }
+handle_reboot() { fail "pending driver activation must never reboot"; }
 FLOW=""
 assert_status 24 "pending driver activation returns a distinct nonzero status" capture_main_output --gpu-arch gfx1201 --non-interactive --skip-reboot
-assert_contains "$MAIN_OUTPUT" "driver activation" "pending driver status explains the required reboot"
-assert_eq $'root\nsystem\ngpu:gfx1201\nplan\nprint-plan\nconfirm\nreboot' "${FLOW%$'\n'}" "pending driver activation stops before prerequisites and ROCm"
+assert_contains "$MAIN_OUTPUT" "driver activation" "pending driver status explains the required user reboot"
+assert_eq $'root\nsystem\ngpu:gfx1201\nplan\nprint-plan\nconfirm' "${FLOW%$'\n'}" "pending driver activation stops without rebooting"
 
 resolve_install_plan() {
     INSTALL_PLAN=([kernel_status]=ready [driver_mode]=inbox [driver_status]=runtime-failed [method]=apt)
@@ -233,10 +228,10 @@ resolve_install_plan() {
     record_step plan
 }
 step_install_driver() { record_step driver; DRIVER_ACTIVATION_REQUIRED=true; }
-handle_reboot() { record_step reboot; }
+handle_reboot() { fail "new driver installation must never reboot"; }
 FLOW=""
-assert_status 24 "new driver installation stops for activation" capture_main_output --gpu-arch gfx1201 --non-interactive --skip-reboot
-assert_eq $'root\nsystem\ngpu:gfx1201\nplan\nprint-plan\nconfirm\ndriver\nreboot' "${FLOW%$'\n'}" "new driver activation stops before prerequisites and ROCm"
+assert_status 24 "new driver installation stops for user activation" capture_main_output --gpu-arch gfx1201 --non-interactive --skip-reboot
+assert_eq $'root\nsystem\ngpu:gfx1201\nplan\nprint-plan\nconfirm\ndriver' "${FLOW%$'\n'}" "new driver activation stops without rebooting"
 
 MOCK_DKMS_PACKAGE_VERSION=''
 MOCK_DKMS_FIRMWARE_PACKAGE_VERSION=''
@@ -274,21 +269,21 @@ run_cmd() {
     fi
 }
 
-real_dkms_package_version='1:6.19.14.31400000-2364437.24.04'
-real_dkms_firmware_version='1:31.40.0.0.31400000-2364437.24.04'
-real_dkms_status=$'amdgpu/6.19.14-2364437.24.04, 6.8.0-138-generic, x86_64: installed\namdgpu/6.19.14-2364437.24.04, 7.0.0-28-generic, x86_64: installed'
+real_dkms_package_version='1:6.19.18.31500000-2364437.24.04'
+real_dkms_firmware_version='1:31.50.0.0.31500000-2364437.24.04'
+real_dkms_status=$'amdgpu/6.19.18-2364437.24.04, 6.8.0-138-generic, x86_64: installed\namdgpu/6.19.18-2364437.24.04, 7.0.0-28-generic, x86_64: installed'
 AMDGPU_DKMS_PACKAGE_VERSION=$real_dkms_package_version
 AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION=$real_dkms_firmware_version
 AMDGPU_DKMS_STATUS=$real_dkms_status
 KERNEL_VERSION=6.8.0-138-generic
-assert_success "real AMDGPU 31.40 package and DKMS metadata is clean" amdgpu_dkms_is_clean_3140
-AMDGPU_DKMS_STATUS='amdgpu/6.19.14-2364437.24.04, 7.0.0-28-generic, x86_64: installed'
-assert_fails "AMDGPU 31.40 without the running-kernel module is not clean" amdgpu_dkms_is_clean_3140
+assert_success "real AMDGPU 31.50 package and DKMS metadata is clean" amdgpu_dkms_is_clean_3140
+AMDGPU_DKMS_STATUS='amdgpu/6.19.18-2364437.24.04, 7.0.0-28-generic, x86_64: installed'
+assert_fails "AMDGPU 31.50 without the running-kernel module is not clean" amdgpu_dkms_is_clean_3140
 AMDGPU_DKMS_STATUS=$real_dkms_status
-AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION='1:31.30.0.0.31300000-older.24.04'
-assert_fails "AMDGPU 31.40 with mismatched firmware is not clean" amdgpu_dkms_is_clean_3140
-AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION='1:31x40.0.0.31400000-2364437.24.04'
-assert_fails "malformed AMDGPU firmware release text is not accepted as 31.40" amdgpu_dkms_is_clean_3140
+AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION='1:31.40.0.0.31400000-older.24.04'
+assert_fails "AMDGPU 31.50 with mismatched firmware is not clean" amdgpu_dkms_is_clean_3140
+AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION='1:31x50.0.0.31500000-2364437.24.04'
+assert_fails "malformed AMDGPU firmware release text is not accepted as 31.50" amdgpu_dkms_is_clean_3140
 AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION=$real_dkms_firmware_version
 
 runtime_pci_root="${TEST_TEMP_ROOT}/runtime-pci"

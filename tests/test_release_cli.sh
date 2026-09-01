@@ -34,15 +34,13 @@ run_invalid_option() {
     return "$status"
 }
 
-assert_eq "7.14.0" "$ROCM_VERSION" "release is fixed at ROCm 7.14.0"
-assert_eq "7.14" "$ROCM_SERIES" "package series is fixed at 7.14"
-assert_eq "31.40" "$AMDGPU_RELEASE" "AMDGPU migration release is fixed at 31.40"
+assert_eq "10.0.0" "$ROCM_VERSION" "release is fixed at ROCm 10.0.0"
+assert_eq "10.0" "$ROCM_SERIES" "package series is fixed at 10.0"
+assert_eq "31.50" "$AMDGPU_RELEASE" "AMDGPU migration release is fixed at 31.50"
 assert_eq "https://repo.amd.com/rocm/packages-multi-arch" "$ROCM_PACKAGES_ROOT" "APT package root is fixed"
-assert_eq "https://repo.amd.com/rocm/whl-multi-arch/" "$ROCM_WHL_INDEX" "wheel index is fixed"
-assert_eq "https://repo.amd.com/rocm/tarball-multi-arch/" "$ROCM_TARBALL_ROOT" "tarball root is fixed"
 assert_eq "https://rocm.docs.amd.com/en/latest/install/rocm.html?fam=all&w=compute&os=ubuntu&ubuntu-ver=24.04&i=runfile" "$ROCM_GPU_LOOKUP_URL" "official GPU lookup URL is fixed"
 assert_eq "https://github.com/amdjiahangpan/hello-rocm/blob/master/docs/zh/00-environment/rocm-gpu-architecture-table.md" "$ROCM_GPU_LOOKUP_ZH_URL" "Chinese GPU lookup URL is fixed"
-assert_eq "https://repo.radeon.com/rocm/installer/rocm-runfile-installer/rocm-rel-7.14/rocm-installer-7.14.0-7.run" "$ROCM_RUNFILE_URL" "official ROCm 7.14 Runfile URL is fixed"
+assert_eq "https://repo.radeon.com/rocm/installer/rocm-runfile-installer/rocm-rel-10.0/rocm-installer-10.0.0-4.run" "$ROCM_RUNFILE_URL" "official ROCm 10 Runfile URL is fixed"
 
 reset_defaults
 assert_eq "compute" "$WORKLOAD" "compute is the only default workload"
@@ -51,10 +49,7 @@ assert_eq "full" "$PACKAGE_PROFILE" "the full SDK is installed by default"
 assert_eq "" "$GPU_ARCHES" "GPU architecture collection is empty by default"
 assert_eq "" "$GPU_PRODUCT_NAMES" "GPU product-name collection is empty by default"
 assert_eq "false" "$SKIP_SSH" "SSH setup is enabled by default"
-assert_eq "0" "$REBOOT_DELAY" "reboot is immediate by default"
-assert_eq "false" "$PREPARE_KERNEL" "kernel preparation is disabled by default"
-assert_eq "false" "$REBOOT_AFTER_KERNEL" "kernel reboot automation is disabled by default"
-assert_eq "false" "$ALLOW_UNQUALIFIED_KERNEL" "unqualified kernel override is disabled by default"
+assert_eq "0" "$REBOOT_DELAY" "legacy reboot delay remains inert by default"
 
 GPU_ARCH=gfx1151
 GPU_PRODUCT_NAME='AMD Radeon RX 9060 XT'
@@ -76,10 +71,8 @@ assert_eq "gfx1100,gfx1151" "$(records_to_csv $'gfx1151\ngfx1100\ngfx1151')" "no
 
 assert_success "APT method parses" parse_succeeds --method apt
 assert_eq "apt" "$INSTALL_METHOD" "APT method is retained"
-assert_success "pip method parses" parse_succeeds --method pip
-assert_eq "pip" "$INSTALL_METHOD" "pip method is retained"
-assert_success "tarball method parses" parse_succeeds --method tarball
-assert_eq "tarball" "$INSTALL_METHOD" "tarball method is retained"
+assert_fails "pip method is removed" parse_fails --method pip
+assert_fails "tarball method is removed" parse_fails --method tarball
 assert_success "runfile method parses" parse_succeeds --method runfile --gpu-arch all
 assert_eq runfile "$INSTALL_METHOD" "runfile method is retained"
 assert_eq all "$GPU_ARCHES" "runfile all architecture is retained"
@@ -96,16 +89,9 @@ assert_eq "true" "$SKIP_SSH" "SSH setup can be skipped"
 assert_eq "-1" "$REBOOT_DELAY" "reboot can be skipped"
 assert_eq "true" "$NON_INTERACTIVE" "non-interactive mode is retained"
 
-parse_succeeds --prepare-kernel --reboot-after-kernel
-assert_eq true "$PREPARE_KERNEL" "kernel preparation can be explicitly enabled"
-assert_eq true "$REBOOT_AFTER_KERNEL" "one-shot kernel reboot can be explicitly enabled"
-assert_fails "kernel reboot automation requires kernel preparation" parse_fails --reboot-after-kernel
-parse_succeeds --allow-unqualified-kernel
-assert_eq true "$ALLOW_UNQUALIFIED_KERNEL" "unqualified kernel override requires an explicit flag"
-assert_fails "unqualified kernel override rejects kernel preparation" parse_fails --allow-unqualified-kernel --prepare-kernel
-assert_fails "unqualified kernel override rejects automatic kernel reboot" parse_fails --allow-unqualified-kernel --prepare-kernel --reboot-after-kernel
-assert_fails "unqualified kernel override rejects verify-only mode" parse_fails --allow-unqualified-kernel --verify-only
-assert_fails "unqualified kernel override rejects uninstall mode" parse_fails --allow-unqualified-kernel --uninstall
+assert_fails "kernel preparation option is removed" parse_fails --prepare-kernel
+assert_fails "kernel reboot automation option is removed" parse_fails --reboot-after-kernel
+assert_fails "unqualified kernel override is removed" parse_fails --allow-unqualified-kernel
 
 parse_succeeds --gpu-arch gfx1151 --gpu-arch gfx1100 --gpu-arch gfx1151
 assert_eq $'gfx1151\ngfx1100\ngfx1151' "$GPU_ARCHES" "repeated GPU architecture overrides append raw records"
@@ -127,8 +113,8 @@ assert_fails "unknown options are rejected" parse_fails --distribution ubuntu
 assert_fails "verify and uninstall modes are exclusive" parse_fails --verify-only --uninstall
 assert_fails "root passwords containing a newline are rejected" parse_fails --root-password $'unsafe\npassword'
 assert_fails "root passwords containing a carriage return are rejected" parse_fails --root-password $'unsafe\rpassword'
-assert_fails "verify-only rejects kernel preparation" parse_fails --verify-only --prepare-kernel
-assert_fails "uninstall rejects kernel preparation" parse_fails --uninstall --prepare-kernel
+assert_fails "verify-only rejects removed kernel preparation option" parse_fails --verify-only --prepare-kernel
+assert_fails "uninstall rejects removed kernel preparation option" parse_fails --uninstall --prepare-kernel
 
 assert_status 1 "bash launcher preserves an invalid-option failure" run_invalid_option bash
 assert_eq "" "$ENTRYPOINT_STDOUT" "bash launcher keeps invalid-option diagnostics off stdout"
@@ -140,12 +126,12 @@ assert_contains "$ENTRYPOINT_STDERR" "argument parsing" "direct launcher identif
 assert_contains "$ENTRYPOINT_STDERR" "--help" "direct launcher tells users how to correct invalid options on stderr"
 
 help_output=$(show_help)
-assert_contains "$help_output" "ROCm 7.14.0" "help names the fixed release"
-assert_contains "$help_output" "apt, pip, tarball, or runfile" "help lists all four install methods"
+assert_contains "$help_output" "ROCm 10.0.0" "help names the fixed release"
+assert_contains "$help_output" "apt or runfile" "help lists only supported methods"
 assert_contains "$help_output" "may be repeated" "help documents repeated GPU architecture overrides"
-assert_contains "$help_output" "--prepare-kernel" "help documents explicit kernel preparation"
-assert_contains "$help_output" "--reboot-after-kernel" "help documents explicit one-shot kernel reboot"
-assert_contains "$help_output" "--allow-unqualified-kernel" "help documents the unsupported 6.17 Radeon override"
+assert_not_contains "$help_output" "--prepare-kernel" "help omits kernel preparation"
+assert_not_contains "$help_output" "--reboot-after-kernel" "help omits kernel reboot automation"
+assert_not_contains "$help_output" "--allow-unqualified-kernel" "help omits the old kernel override"
 assert_contains "$help_output" "$ROCM_GPU_LOOKUP_URL" "help prints the official GPU lookup URL"
 assert_contains "$help_output" "gfx=all" "help documents the explicit Runfile all fallback"
 assert_not_contains "$help_output" "graphics workload" "help does not advertise a graphics workload"

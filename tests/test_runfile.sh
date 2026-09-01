@@ -7,8 +7,6 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 ROCM_RUNFILE_STATE_ROOT="${TEST_TEMP_ROOT}/runfile-state"
 ROCM_RUNFILE_ROOT="${TEST_TEMP_ROOT}/runfile-root"
 TMPDIR=$TEST_TEMP_ROOT
-ROCM_PIP_ROOT="${TEST_TEMP_ROOT}/pip-root"
-ROCM_TARBALL_INSTALL_ROOT="${TEST_TEMP_ROOT}/tarball-root"
 MOCK_APT_CONFLICT=''
 rocm_apt_installed_package_candidates() {
     [[ -z "$MOCK_APT_CONFLICT" ]] || printf '%s\n' "$MOCK_APT_CONFLICT"
@@ -71,22 +69,21 @@ assert_contains "$RECORDED_COMMANDS" "target=/opt" "Runfile installation pins th
 assert_success "installed Runfile layout is ready" runfile_installation_is_ready
 assert_eq function "$(type -t validate_rocm_layout_compatibility || true)" "layout conflict checks use a production helper"
 state_path=$(runfile_state_path)
-printf 'version=7.14.0\ngfx=gfx1201\nurl=%s\n' "$ROCM_RUNFILE_URL" > "$state_path"
+printf 'version=10.0.0\ngfx=gfx1201\nurl=%s\n' "$ROCM_RUNFILE_URL" > "$state_path"
 assert_fails "Runfile marker with non-all payload is not ready" runfile_installation_is_ready
-printf 'version=7.14.0\ngfx=all\nurl=%s\n' "$ROCM_RUNFILE_URL" > "$state_path"
+printf 'version=10.0.0\ngfx=all\nurl=%s\n' "$ROCM_RUNFILE_URL" > "$state_path"
 assert_success "exact all marker restores readiness" runfile_installation_is_ready
 
 reset_test_state
 assert_success "ready Runfile all installation is idempotent" install_rocm_runfile
 assert_fails "registered Runfile layout blocks APT" validate_rocm_layout_compatibility apt
-assert_fails "registered Runfile layout blocks pip" validate_rocm_layout_compatibility pip
-assert_fails "registered Runfile layout blocks tarball" validate_rocm_layout_compatibility tarball
-assert_contains "$RECORDED_COMMANDS" "gfx=list-installed" "idempotent Runfile validates installed architecture metadata"
+assert_fails "removed pip method is rejected" validate_rocm_layout_compatibility pip
+assert_fails "removed tarball method is rejected" validate_rocm_layout_compatibility tarball
 assert_not_contains "$RECORDED_COMMANDS" "deps=install" "idempotent Runfile does not reinstall an all payload"
 
 rm -f "$(runfile_state_path)"
 rm -rf "$ROCM_RUNFILE_ROOT"
-MOCK_APT_CONFLICT=amdrocm-core-sdk7.14-gfx1200
+MOCK_APT_CONFLICT=amdrocm10.0-gfx1200
 reset_test_state
 assert_fails "Runfile installation rejects an existing APT ROCm layout" install_rocm_runfile
 
@@ -94,12 +91,6 @@ MOCK_APT_CONFLICT=''
 MOCK_LEGACY_CONFLICT=rocm-dev
 assert_fails "legacy package-manager ROCm blocks Runfile" validate_rocm_layout_compatibility runfile
 MOCK_LEGACY_CONFLICT=''
-mkdir -p "$ROCM_PIP_ROOT"
-assert_fails "existing pip layout blocks Runfile" validate_rocm_layout_compatibility runfile
-rm -rf "$ROCM_PIP_ROOT"
-mkdir -p "$ROCM_TARBALL_INSTALL_ROOT"
-assert_fails "existing tarball layout blocks Runfile" validate_rocm_layout_compatibility runfile
-rm -rf "$ROCM_TARBALL_INSTALL_ROOT"
 assert_eq '' "$RECORDED_COMMANDS" "APT conflict is detected before Runfile download"
 
 rm -rf "$ROCM_RUNFILE_ROOT" "$ROCM_RUNFILE_STATE_ROOT"
