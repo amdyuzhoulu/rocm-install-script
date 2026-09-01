@@ -20,28 +20,25 @@ AMDGPU_REPOSITORY=https://repo.radeon.com/amdgpu/${AMDGPU_RELEASE}/ubuntu
 AMDGPU_GPG_KEY_URL=https://repo.radeon.com/rocm/rocm.gpg.key
 SUPPORTED_OS_KEYS=ubuntu-24.04.4,ubuntu-26.04
 R9700_PCI_ID=1002:7551
-KERNEL_MIN_FREE_KIB=524288
 EXIT_KERNEL_ACTION_REQUIRED=20
-EXIT_KERNEL_REBOOT_REQUIRED=21
-EXIT_KERNEL_REBOOT_FAILED=22
 EXIT_DRIVER_RUNTIME_FAILED=23
 EXIT_DRIVER_REBOOT_REQUIRED=24
 
-ARTIFACT_DATA='gfx950|gfx950|device-gfx950|therock-dist-linux-gfx950-dcgpu-7.14.0.tar.gz
-gfx942|gfx942|device-gfx942|therock-dist-linux-gfx94X-dcgpu-7.14.0.tar.gz
-gfx90a|gfx90a|device-gfx90a|therock-dist-linux-gfx90a-7.14.0.tar.gz
-gfx908|gfx908|device-gfx908|therock-dist-linux-gfx908-7.14.0.tar.gz
-gfx1201|gfx1201|device-gfx1201|therock-dist-linux-gfx120X-all-7.14.0.tar.gz
-gfx1200|gfx1200|device-gfx1200|therock-dist-linux-gfx120X-all-7.14.0.tar.gz
-gfx1100|gfx1100|device-gfx1100|therock-dist-linux-gfx110X-all-7.14.0.tar.gz
-gfx1101|gfx1101|device-gfx1101|therock-dist-linux-gfx110X-all-7.14.0.tar.gz
-gfx1102|gfx1102|device-gfx1102|therock-dist-linux-gfx110X-all-7.14.0.tar.gz
-gfx1030|gfx1030|device-gfx1030|therock-dist-linux-gfx103X-all-7.14.0.tar.gz
-gfx1151|gfx1151|device-gfx1151|therock-dist-linux-gfx1151-7.14.0.tar.gz
-gfx1150|gfx1150|device-gfx1150|therock-dist-linux-gfx1150-7.14.0.tar.gz
-gfx1152|gfx1152|device-gfx1152|therock-dist-linux-gfx1152-7.14.0.tar.gz
-gfx1153|gfx1153|device-gfx1153|therock-dist-linux-gfx1153-7.14.0.tar.gz
-gfx1103|gfx1103|device-gfx1103|therock-dist-linux-gfx110X-all-7.14.0.tar.gz'
+ARTIFACT_DATA='gfx950
+gfx942
+gfx90a
+gfx908
+gfx1201
+gfx1200
+gfx1100
+gfx1101
+gfx1102
+gfx1030
+gfx1151
+gfx1150
+gfx1152
+gfx1153
+gfx1103'
 
 PCI_GPU_DATA='7590|*|gfx1200|radeon'
 
@@ -61,20 +58,20 @@ gfx1152|ryzen
 gfx1153|ryzen
 gfx1103|ryzen'
 
-declare -A ROCM_714_ARTIFACT_RECORDS=()
-declare -A ROCM_714_OS_RECORDS=(
+declare -A ROCM_100_ARTIFACT_RECORDS=()
+declare -A ROCM_100_OS_RECORDS=(
     [ubuntu-24.04.4]='apt|ubuntu2404'
     [ubuntu-26.04]='apt|ubuntu2604'
 )
 declare -A INSTALL_PLAN=()
 
 initialize_tables() {
-    local gfx package_suffix pip_extra tarball_artifact
+    local gfx
 
-    ROCM_714_ARTIFACT_RECORDS=()
-    while IFS='|' read -r gfx package_suffix pip_extra tarball_artifact; do
+    ROCM_100_ARTIFACT_RECORDS=()
+    while IFS= read -r gfx || [[ -n "$gfx" ]]; do
         [[ -n "$gfx" ]] || continue
-        ROCM_714_ARTIFACT_RECORDS["$gfx"]="${package_suffix}|${pip_extra}|${tarball_artifact}"
+        ROCM_100_ARTIFACT_RECORDS["$gfx"]=1
     done <<< "$ARTIFACT_DATA"
 }
 
@@ -84,9 +81,6 @@ reset_defaults() {
     SKIP_SSH=false
     ROOT_PASSWORD=''
     REBOOT_DELAY=0
-    PREPARE_KERNEL=false
-    REBOOT_AFTER_KERNEL=false
-    ALLOW_UNQUALIFIED_KERNEL=false
     VERIFY_ONLY=false
     UNINSTALL=false
     NON_INTERACTIVE=false
@@ -125,14 +119,14 @@ normalize_os_key() {
 resolve_os_record() {
     local os_key=${1:-}
 
-    [[ $# -eq 1 && -n ${ROCM_714_OS_RECORDS[$os_key]+x} ]] || return 1
-    printf '%s\n' "${ROCM_714_OS_RECORDS[$os_key]}"
+    [[ $# -eq 1 && -n ${ROCM_100_OS_RECORDS[$os_key]+x} ]] || return 1
+    printf '%s\n' "${ROCM_100_OS_RECORDS[$os_key]}"
 }
 
 validate_artifact_gfx() {
     local gfx=${1:-}
 
-    [[ $# -eq 1 && -n ${ROCM_714_ARTIFACT_RECORDS[$gfx]+x} ]] || return 1
+    [[ $# -eq 1 && -n ${ROCM_100_ARTIFACT_RECORDS[$gfx]+x} ]] || return 1
 }
 
 normalize_records() {
@@ -176,48 +170,13 @@ records_to_csv() {
 }
 
 resolve_package_name() {
-    local profile=${1:-} gfx=${2:-} record package_suffix
+    local profile=${1:-} gfx=${2:-}
 
     [[ $# -eq 2 && "$profile" == full ]] || return 1
     validate_artifact_gfx "$gfx" || return 1
-    record=${ROCM_714_ARTIFACT_RECORDS[$gfx]}
-    IFS='|' read -r package_suffix _ _ <<< "$record"
-    printf 'amdrocm-core-sdk%s-%s\n' "$ROCM_SERIES" "$package_suffix"
+    printf 'amdrocm-core-sdk%s-%s\n' "$ROCM_SERIES" "$gfx"
 }
 
-resolve_pip_requirement() {
-    local gfxes=${1:-} normalized_gfxes gfx record pip_extra
-    local requirement='rocm[libraries'
-
-    [[ $# -eq 1 ]] || return 1
-    normalized_gfxes=$(normalize_gfxes "$gfxes") || return 1
-    [[ "$gfxes" == "$normalized_gfxes" ]] || return 1
-    while IFS= read -r gfx || [[ -n "$gfx" ]]; do
-        record=${ROCM_714_ARTIFACT_RECORDS[$gfx]}
-        IFS='|' read -r _ pip_extra _ <<< "$record"
-        requirement+=",${pip_extra}"
-    done <<< "$normalized_gfxes"
-    printf '%s]==%s\n' "$requirement" "$ROCM_VERSION"
-}
-
-resolve_tarball_artifact() {
-    local gfxes=${1:-} normalized_gfxes gfx record tarball_artifact
-    local -a gfx_records=()
-
-    [[ $# -eq 1 ]] || return 1
-    normalized_gfxes=$(normalize_gfxes "$gfxes") || return 1
-    [[ "$gfxes" == "$normalized_gfxes" ]] || return 1
-    while IFS= read -r gfx || [[ -n "$gfx" ]]; do
-        gfx_records+=("$gfx")
-    done <<< "$normalized_gfxes"
-    if ((${#gfx_records[@]} > 1)); then
-        printf '%s\n' "$ROCM_MULTIARCH_TARBALL_ARTIFACT"
-        return 0
-    fi
-    record=${ROCM_714_ARTIFACT_RECORDS[${gfx_records[0]}]}
-    IFS='|' read -r _ _ tarball_artifact <<< "$record"
-    printf '%s\n' "$tarball_artifact"
-}
 
 is_supported_gpu_arch() {
     validate_artifact_gfx "${1:-}"
@@ -1073,97 +1032,10 @@ capture_cmd() {
     "$@"
 }
 
-kernel_package_is_installed() {
-    local package=${1:-} package_status
-
-    [[ $# -eq 1 && -n "$package" ]] || return 1
-    package_status=$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null) || return 1
-    [[ "$package_status" == installed ]]
-}
-
-approved_kernel_spec_is_valid() {
-    local kernel_target=${1:-} kernel_package=${2:-}
-
-    [[ $# -eq 2 ]] || return 1
-    case "$kernel_target|$kernel_package" in
-        '6.14.*-oem|linux-oem-6.14'|'6.8.*-generic|linux-generic'|'7.0.*-generic|linux-generic-7.0') ;;
-        *) return 1 ;;
-    esac
-}
-
-kernel_package_has_candidate() {
-    local package=${1:-} policy_output line candidate='' candidate_count=0
-
-    [[ $# -eq 1 && -n "$package" ]] || return 1
-    policy_output=$(capture_cmd env LC_ALL=C apt-cache policy "$package") || return $?
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        [[ "$line" =~ ^[[:space:]]*Candidate: ]] || continue
-        candidate_count=$((candidate_count + 1))
-        [[ "$line" =~ ^[[:space:]]*Candidate:[[:space:]]+([^[:space:]]+)[[:space:]]*$ ]] || return 1
-        candidate=${BASH_REMATCH[1]}
-    done <<< "$policy_output"
-    [[ $candidate_count -eq 1 && "$candidate" != '(none)' ]]
-}
-
-kernel_install_simulation_is_safe() {
-    local package=${1:-} simulation_output line
-
-    [[ $# -eq 1 && -n "$package" ]] || return 1
-    simulation_output=$(capture_cmd env LC_ALL=C apt-get --simulate --no-remove --install-recommends install "$package") || return $?
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        [[ ! "$line" =~ ^[[:space:]]*Remv[[:space:]] ]] || return 1
-    done <<< "$simulation_output"
-}
-
-kernel_boot_image_exists() {
-    local kernel_target=${1:-} boot_dir=${KERNEL_BOOT_DIR:-/boot} image pattern
-
-    [[ $# -eq 1 && -d "$boot_dir" ]] || return 1
-    case "$kernel_target" in
-        '6.14.*-oem') pattern='vmlinuz-6.14.*-oem' ;;
-        '6.8.*-generic') pattern='vmlinuz-6.8.*-generic' ;;
-        '7.0.*-generic') pattern='vmlinuz-7.0.*-generic' ;;
-        *) return 1 ;;
-    esac
-    for image in "$boot_dir"/$pattern; do
-        [[ -f "$image" && -r "$image" && -s "$image" ]] && return 0
-    done
-    return 1
-}
-
-resolve_kernel_status() {
-    local kernel_target=${1:-} kernel_package=${2:-} kernel_release=${3:-}
-
-    [[ $# -eq 3 ]] || return 1
-    approved_kernel_spec_is_valid "$kernel_target" "$kernel_package" || return 1
-    if kernel_release_matches_target "$kernel_target" "$kernel_release"; then
-        printf '%s\n' ready
-    elif kernel_package_is_installed "$kernel_package" && kernel_boot_image_exists "$kernel_target"; then
-        printf '%s\n' reboot-required
-    else
-        printf '%s\n' install-required
-    fi
-}
-
-r9700_identity_is_verified() {
-    local gfxes=${1:-} gpu_count=${2:-} unmapped_pci=${3:-}
-    local record bdf pci_id revision extra pci_count=0
-
-    [[ $# -eq 3 && "$gfxes" == gfx1201 && "$gpu_count" =~ ^[1-9][0-9]*$ && -n "$unmapped_pci" ]] || return 1
-    while IFS= read -r record || [[ -n "$record" ]]; do
-        IFS='|' read -r bdf pci_id revision extra <<< "$record"
-        [[ "$bdf" =~ ^[[:xdigit:]]{4}:[[:xdigit:]]{2}:[[:xdigit:]]{2}\.[0-7]$ \
-            && "$pci_id" == "$R9700_PCI_ID" \
-            && "$revision" =~ ^[[:xdigit:]]{4}$ \
-            && -z "$extra" ]] || return 1
-        pci_count=$((pci_count + 1))
-    done <<< "$unmapped_pci"
-    ((pci_count == gpu_count))
-}
 
 resolve_kernel_support_record() {
     local driver_mode=${1:-} os_key=${2:-} gpu_classes=${3:-} gfxes=${4:-} gpu_count=${5:-}
-    local unmapped_pci=${6:-} kernel_release=${7:-} kernel_target=${8:-} kernel_package=${9:-} kernel_status major minor
+    local unmapped_pci=${6:-} kernel_release=${7:-} kernel_target=${8:-} kernel_package=${9:-} major minor
 
     [[ $# -eq 9 ]] || return 1
     [[ "$(resolve_gpu_classes "$gfxes")" == "$gpu_classes" ]] || return 1
@@ -1172,36 +1044,13 @@ resolve_kernel_support_record() {
     minor=${BASH_REMATCH[2]}
     if ((major < 6 || (major == 6 && minor < 8))); then
         printf '%s\n' 'install-required|qualified'
-        return 0
-    fi
-    kernel_status=$(resolve_kernel_status "$kernel_target" "$kernel_package" "$kernel_release") || return $?
-    if [[ "$kernel_status" == ready ]]; then
+    elif kernel_release_matches_target "$kernel_target" "$kernel_release"; then
         printf '%s\n' 'ready|qualified'
     else
         printf '%s\n' 'ready-unqualified|unqualified'
     fi
 }
 
-kernel_boot_has_minimum_free_space() {
-    local boot_dir=${KERNEL_BOOT_DIR:-/boot} df_output header data_line
-    local filesystem blocks used available capacity mount_point extra
-    local header_filesystem header_blocks header_used header_available header_capacity header_mounted header_on header_extra
-    local -a df_lines=()
-
-    [[ -d "$boot_dir" ]] || return 1
-    df_output=$(capture_cmd env LC_ALL=C df -Pk "$boot_dir") || return $?
-    while IFS= read -r data_line || [[ -n "$data_line" ]]; do
-        df_lines+=("$data_line")
-    done <<< "$df_output"
-    [[ ${#df_lines[@]} -eq 2 ]] || return 1
-    header=${df_lines[0]}
-    data_line=${df_lines[1]}
-    read -r header_filesystem header_blocks header_used header_available header_capacity header_mounted header_on header_extra <<< "$header"
-    [[ "$header_filesystem" == Filesystem && "$header_blocks" == 1024-blocks && "$header_used" == Used && "$header_available" == Available && "$header_capacity" == Capacity && "$header_mounted" == Mounted && "$header_on" == on && -z "$header_extra" ]] || return 1
-    read -r filesystem blocks used available capacity mount_point extra <<< "$data_line"
-    [[ -n "$filesystem" && "$blocks" =~ ^[0-9]+$ && "$used" =~ ^[0-9]+$ && "$available" =~ ^[0-9]+$ && "$capacity" =~ ^[0-9]+%$ && -n "$mount_point" && -z "$extra" ]] || return 1
-    ((10#$available >= KERNEL_MIN_FREE_KIB))
-}
 
 
 write_managed_file() {
@@ -1283,93 +1132,6 @@ install_rocm_apt() {
     rocm_apt_verification_root_exists /opt/rocm
 }
 
-install_rocm_pip() {
-    local artifacts=${INSTALL_PLAN[artifacts]:-} requirement
-    local venv_path="/opt/rocm-${ROCM_VERSION}-venv"
-    local -a requirements=()
-
-    [[ -n "$artifacts" ]] || return 1
-    while IFS= read -r requirement || [[ -n "$requirement" ]]; do
-        [[ "$requirement" != *$'\r'* && "$requirement" =~ [^[:space:]] ]] || return 1
-        requirements+=("$requirement")
-    done < <(printf '%s' "$artifacts")
-    [[ ${#requirements[@]} -eq 1 ]] || return 1
-    requirement=${requirements[0]}
-    run_cmd python3 -m venv "$venv_path" || return $?
-    run_cmd "${venv_path}/bin/pip" install --index-url "$ROCM_WHL_INDEX" "$requirement"
-}
-
-install_rocm_tarball() {
-    local artifacts=${INSTALL_PLAN[artifacts]:-} artifact
-    local install_root="/opt/rocm-${ROCM_VERSION}"
-    local temp_dir stage_root backup_root archive_url archive_path status
-    local had_existing_root=false
-    local -a artifacts_to_install=()
-
-    [[ -n "$artifacts" ]] || return 1
-    while IFS= read -r artifact || [[ -n "$artifact" ]]; do
-        [[ "$artifact" != *$'\r'* && "$artifact" =~ [^[:space:]] ]] || return 1
-        artifacts_to_install+=("$artifact")
-    done < <(printf '%s' "$artifacts")
-    [[ ${#artifacts_to_install[@]} -eq 1 ]] || return 1
-    artifact=${artifacts_to_install[0]}
-    temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/rocm-tarball.XXXXXX") || return $?
-    stage_root="${temp_dir}/staging"
-    backup_root="${temp_dir}/previous-rocm-${ROCM_VERSION}"
-    archive_url="${ROCM_TARBALL_ROOT}${artifact}"
-    archive_path="${temp_dir}/${artifact}"
-
-    run_cmd curl -fL --retry 0 --output "$archive_path" "$archive_url" || {
-        status=$?
-        run_cmd rm -rf "$temp_dir" || return $?
-        return "$status"
-    }
-    run_cmd install -d -m 0755 "$stage_root" || {
-        status=$?
-        run_cmd rm -rf "$temp_dir" || return $?
-        return "$status"
-    }
-    run_cmd tar -xzf "$archive_path" --strip-components=1 -C "$stage_root" || {
-        status=$?
-        run_cmd rm -rf "$temp_dir" || return $?
-        return "$status"
-    }
-    if run_cmd test -e "$install_root"; then
-        had_existing_root=true
-        run_cmd mv "$install_root" "$backup_root" || {
-            status=$?
-            run_cmd rm -rf "$temp_dir" || return $?
-            return "$status"
-        }
-    else
-        status=$?
-        if [[ $status -ne 1 ]]; then
-            run_cmd rm -rf "$temp_dir" || return $?
-            return "$status"
-        fi
-    fi
-    run_cmd mv "$stage_root" "$install_root" || {
-        status=$?
-        if [[ "$had_existing_root" == true ]]; then
-            run_cmd mv "$backup_root" "$install_root" || return $?
-        fi
-        run_cmd rm -rf "$temp_dir" || return $?
-        return "$status"
-    }
-    run_cmd ln -sfn "$install_root" /opt/rocm || {
-        status=$?
-        run_cmd rm -rf "$install_root" || return $?
-        if [[ "$had_existing_root" == true ]]; then
-            run_cmd mv "$backup_root" "$install_root" || return $?
-        fi
-        run_cmd rm -rf "$temp_dir" || return $?
-        return "$status"
-    }
-    if [[ "$had_existing_root" == true ]]; then
-        run_cmd rm -rf "$backup_root" || return $?
-    fi
-    run_cmd rm -rf "$temp_dir"
-}
 
 runfile_state_path() {
     local state_root=${ROCM_RUNFILE_STATE_ROOT:-/var/lib/rocm-installer}
@@ -1414,7 +1176,7 @@ runfile_installation_is_ready() {
 }
 
 all_supported_gfxes() {
-    printf '%s\n' "${!ROCM_714_ARTIFACT_RECORDS[@]}" | LC_ALL=C sort
+    printf '%s\n' "${!ROCM_100_ARTIFACT_RECORDS[@]}" | LC_ALL=C sort
 }
 
 runfile_reports_all_architectures() {
@@ -1560,8 +1322,6 @@ install_rocm() {
     validate_rocm_layout_compatibility "${INSTALL_PLAN[method]:-${INSTALL_METHOD:-}}" || return $?
     case "${INSTALL_PLAN[method]:-${INSTALL_METHOD:-}}" in
         apt) install_rocm_apt ;;
-        pip) install_rocm_pip ;;
-        tarball) install_rocm_tarball ;;
         runfile) install_rocm_runfile ;;
         *) return 1 ;;
     esac
@@ -1885,8 +1645,6 @@ step_prerequisites() {
     )
 
     case "${INSTALL_PLAN[method]:-${INSTALL_METHOD:-}}" in
-        pip) required_packages+=(python3 python3-venv python3-pip) ;;
-        tarball) required_packages+=(tar gzip) ;;
         apt|runfile) ;;
         *) return 1 ;;
     esac
@@ -1975,7 +1733,7 @@ is_expected_rocm_link() {
 rocm_apt_package_candidates() {
     local gfx package
 
-    for gfx in "${!ROCM_714_ARTIFACT_RECORDS[@]}"; do
+    for gfx in "${!ROCM_100_ARTIFACT_RECORDS[@]}"; do
         package=$(resolve_package_name full "$gfx") || return $?
         printf '%s\n' "$package"
     done | LC_ALL=C sort -u
