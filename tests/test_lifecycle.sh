@@ -84,7 +84,7 @@ reset_lifecycle_state() {
         [os_key]=ubuntu-24.04.4
         [repo_slug]=ubuntu2404
         [method]=apt
-        [artifacts]=amdrocm10.0-gfx1151
+        [artifacts]=amdrocm-core-sdk10.0-gfx1151
         [driver_mode]=inbox
         [kernel_status]=ready
         [kernel_target]='6.14.*-oem'
@@ -264,16 +264,16 @@ assert_contains "$RECORDED_COMMANDS" "/etc/profile.d/rocm.sh" "uninstall removes
 
 reset_lifecycle_state
 NON_INTERACTIVE=true
-MOCK_INSTALLED_ROCM_PACKAGES="amdrocm10.0-gfx1151 rocm"
+MOCK_INSTALLED_ROCM_PACKAGES="amdrocm-core-sdk10.0-gfx1151 rocm"
 assert_success "uninstall purges only the exact installed ROCm APT candidate" do_uninstall
-assert_eq "apt-get purge --yes amdrocm10.0-gfx1151" "${RECORDED_COMMANDS%%$'\n'*}" "uninstall purges exactly the installed architecture-specific package"
-assert_not_contains "$RECORDED_COMMANDS" "amdrocm10.0-gfx1201" "uninstall does not purge an uninstalled ROCm candidate"
+assert_eq "apt-get purge --yes amdrocm-core-sdk10.0-gfx1151" "${RECORDED_COMMANDS%%$'\n'*}" "uninstall purges exactly the installed architecture-specific package"
+assert_not_contains "$RECORDED_COMMANDS" "amdrocm-core-sdk10.0-gfx1201" "uninstall does not purge an uninstalled ROCm candidate"
 assert_not_contains "$RECORDED_COMMANDS" "apt-get purge --yes rocm" "uninstall leaves legacy packages outside the current release candidates"
 
 reset_lifecycle_state
 NON_INTERACTIVE=true
-MOCK_INSTALLED_ROCM_PACKAGES="amdrocm10.0-gfx1151"
-MOCK_FAIL_FRAGMENT="apt-get purge --yes amdrocm10.0-gfx1151"
+MOCK_INSTALLED_ROCM_PACKAGES="amdrocm-core-sdk10.0-gfx1151"
+MOCK_FAIL_FRAGMENT="apt-get purge --yes amdrocm-core-sdk10.0-gfx1151"
 assert_status 23 "installed package purge failure is returned after independent cleanup" do_uninstall
 assert_contains "$RECORDED_COMMANDS" "rm -rf /opt/rocm/core-10.0 /opt/rocm-10.0.0" "purge failure still removes fixed installation roots"
 assert_contains "$RECORDED_COMMANDS" "/etc/ld.so.conf.d/rocm.conf" "purge failure still removes fixed configuration"
@@ -384,16 +384,16 @@ recorded_command_count() {
 MOCK_DKMS_PACKAGE_VERSION=""
 MOCK_DKMS_STATUS=""
 MOCK_KERNEL_VERSION=7.0.0-generic
-MOCK_INSTALLED_LEGACY_ROCM_PACKAGES="rocm-dev rocm amdrocm10.0-gfx1151"
+MOCK_INSTALLED_LEGACY_ROCM_PACKAGES="rocm-dev rocm amdrocm-core-sdk10.0-gfx1151"
 assert_success "mocked inbox APT lifecycle runs through the real steps" run_mocked_main apt --gpu-arch gfx1151
 assert_contains "$RECORDED_COMMANDS" "apt-get purge --yes rocm rocm-dev" "main flow purges only the installed legacy ROCm packages"
 assert_not_contains "$RECORDED_COMMANDS" "apt-get purge --yes amdrocm" "main flow keeps amdrocm packages out of legacy migration purges"
-assert_command_before "apt-get purge --yes rocm rocm-dev" "apt-get install --yes amdrocm10.0-gfx1151" "$RECORDED_COMMANDS" "main flow purges legacy ROCm before installing the current package"
-assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm10.0-gfx1151" "main flow installs the architecture-specific APT package"
+assert_command_before "apt-get purge --yes rocm rocm-dev" "apt-get install --yes amdrocm-core-sdk10.0-gfx1151" "$RECORDED_COMMANDS" "main flow purges legacy ROCm before installing the current package"
+assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm-core-sdk10.0-gfx1151" "main flow installs the architecture-specific APT package"
 assert_not_contains "$RECORDED_COMMANDS" "apt-get install --yes amdgpu-dkms" "auto driver mode keeps the inbox driver"
 
 multi_gfxes=$'gfx1200\ngfx1201'
-multi_packages=$'amdrocm10.0-gfx1200\namdrocm10.0-gfx1201'
+multi_packages=$'amdrocm-core-sdk10.0-gfx1200\namdrocm-core-sdk10.0-gfx1201'
 MOCK_DKMS_PACKAGE_VERSION=$REAL_DKMS_PACKAGE_VERSION
 MOCK_DKMS_FIRMWARE_PACKAGE_VERSION=$REAL_DKMS_FIRMWARE_VERSION
 MOCK_DKMS_STATUS="amdgpu/6.19.18-2364437.24.04, ${MOCK_KERNEL_VERSION}, x86_64: installed"
@@ -404,8 +404,8 @@ assert_success "mocked multi-GFX APT lifecycle runs through the real steps" run_
 assert_eq "$multi_gfxes" "$GPU_ARCHES" "duplicate explicit GPU architectures normalize before the APT plan"
 assert_eq "$multi_gfxes" "${INSTALL_PLAN[gfxes]}" "multi-GFX APT plan retains both normalized architectures"
 assert_eq "$multi_packages" "${INSTALL_PLAN[artifacts]}" "multi-GFX APT plan contains one SDK package per architecture"
-assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm10.0-gfx1200 amdrocm10.0-gfx1201" "multi-GFX main installs both SDK packages in one APT transaction"
-assert_eq "1" "$(recorded_command_count "apt-get install --yes amdrocm10.0" "$RECORDED_COMMANDS")" "multi-GFX main performs one ROCm SDK APT transaction"
+assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm-core-sdk10.0-gfx1200 amdrocm-core-sdk10.0-gfx1201" "multi-GFX main installs both SDK packages in one APT transaction"
+assert_eq "1" "$(recorded_command_count "apt-get install --yes amdrocm-core-sdk10.0" "$RECORDED_COMMANDS")" "multi-GFX main performs one ROCm SDK APT transaction"
 MOCK_DKMS_PACKAGE_VERSION=''
 MOCK_DKMS_FIRMWARE_PACKAGE_VERSION=''
 MOCK_DKMS_STATUS=''
@@ -432,7 +432,7 @@ MOCK_REQUIRE_DRIVER_MIGRATION_BEFORE_APT=true
 assert_status 24 "mocked DKMS APT lifecycle stops after migrating an old driver" run_mocked_main apt --gpu-arch gfx1201 --driver-mode dkms --dkms-cleanup always
 assert_contains "$RECORDED_COMMANDS" "dpkg --purge amdgpu-dkms amdgpu-dkms-firmware" "DKMS main flow purges the exact old driver packages"
 assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdgpu-dkms" "DKMS main flow installs AMDGPU 31.50"
-assert_not_contains "$RECORDED_COMMANDS" "amdrocm10.0-gfx1201" "driver activation boundary prevents ROCm installation"
+assert_not_contains "$RECORDED_COMMANDS" "amdrocm-core-sdk10.0-gfx1201" "driver activation boundary prevents ROCm installation"
 
 MOCK_DKMS_PACKAGE_VERSION=31.30.1
 MOCK_DKMS_FIRMWARE_PACKAGE_VERSION=''
@@ -441,7 +441,7 @@ MOCK_REQUIRE_DRIVER_MIGRATION_BEFORE_APT=true
 MOCK_FAIL_FRAGMENT="dpkg --purge amdgpu-dkms"
 assert_status 23 "failed DKMS purge stops the lifecycle before prerequisite APT work" run_mocked_main apt --gpu-arch gfx1201 --driver-mode dkms --dkms-cleanup always
 assert_not_contains "$RECORDED_COMMANDS" "apt-get update" "failed driver migration does not start prerequisite APT work"
-assert_not_contains "$RECORDED_COMMANDS" "amdrocm10.0-gfx1201" "failed driver migration does not install ROCm"
+assert_not_contains "$RECORDED_COMMANDS" "amdrocm-core-sdk10.0-gfx1201" "failed driver migration does not install ROCm"
 
 MOCK_DKMS_PACKAGE_VERSION=""
 MOCK_DKMS_FIRMWARE_PACKAGE_VERSION=""
@@ -450,7 +450,7 @@ MOCK_REQUIRE_DRIVER_MIGRATION_BEFORE_APT=false
 MOCK_INSTALLED_LEGACY_ROCM_PACKAGES="rocm"
 MOCK_FAIL_FRAGMENT="apt-get purge --yes rocm"
 assert_status 23 "failed legacy ROCm purge stops the lifecycle before current package install" run_mocked_main apt --gpu-arch gfx1151
-assert_not_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm10.0-gfx1151" "failed legacy migration does not install the current ROCm package"
+assert_not_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm-core-sdk10.0-gfx1151" "failed legacy migration does not install the current ROCm package"
 assert_not_contains "$MANAGED_FILES" "/etc/profile.d/rocm.sh" "failed legacy migration does not configure the ROCm environment"
 
 MOCK_INSTALLED_LEGACY_ROCM_PACKAGES=""

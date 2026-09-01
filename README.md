@@ -34,13 +34,13 @@ The installer prints an immutable plan and asks for confirmation before changing
 APT uses AMD's multi-architecture repository and installs one architecture-specific ROCm 10.0 meta package for each normalized GFX target:
 
 ```text
-amdrocm10.0-<gfx>
+amdrocm-core-sdk10.0-<gfx>
 ```
 
 For Radeon AI PRO R9700, `gfx1201` selects:
 
 ```text
-amdrocm10.0-gfx1201
+amdrocm-core-sdk10.0-gfx1201
 ```
 
 The ROCm binaries are exposed from `/opt/rocm/core-10.0`. Existing package-manager ROCm conflicts are handled only through the installer's explicit cleanup policy.

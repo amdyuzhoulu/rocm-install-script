@@ -182,7 +182,7 @@ resolve_package_name() {
     validate_artifact_gfx "$gfx" || return 1
     record=${ROCM_714_ARTIFACT_RECORDS[$gfx]}
     IFS='|' read -r package_suffix _ _ <<< "$record"
-    printf 'amdrocm%s-%s\n' "$ROCM_SERIES" "$package_suffix"
+    printf 'amdrocm-core-sdk%s-%s\n' "$ROCM_SERIES" "$package_suffix"
 }
 
 resolve_pip_requirement() {

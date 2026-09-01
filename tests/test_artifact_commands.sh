@@ -19,13 +19,13 @@ assert_command_output_eq "apt|ubuntu2604" "Ubuntu 26.04 uses the multi-arch APT 
 assert_eq "https://stable.repo.amd.com/rocm/core/packages/ubuntu2404" "${ROCM_PACKAGES_ROOT}/ubuntu2404" "Ubuntu 24.04 repository URL is exact"
 supported_gfxes=$'gfx1030\ngfx1100\ngfx1101\ngfx1102\ngfx1103\ngfx1150\ngfx1151\ngfx1152\ngfx1153\ngfx1200\ngfx1201\ngfx908\ngfx90a\ngfx942\ngfx950'
 while IFS= read -r gfx; do
-    assert_command_output_eq "amdrocm10.0-${gfx}" "${gfx} selects the ROCm 10 meta package" resolve_package_name full "$gfx"
+    assert_command_output_eq "amdrocm-core-sdk10.0-${gfx}" "${gfx} selects the ROCm 10 meta package" resolve_package_name full "$gfx"
 done <<< "$supported_gfxes"
 assert_fails "unknown architecture has no package fallback" resolve_package_name full gfx9999
 assert_fails "all is not an APT package architecture" resolve_package_name full all
 
 multi_gfxes=$'gfx1151\ngfx1201'
-multi_packages=$'amdrocm10.0-gfx1151\namdrocm10.0-gfx1201'
+multi_packages=$'amdrocm-core-sdk10.0-gfx1151\namdrocm-core-sdk10.0-gfx1201'
 assert_command_output_eq "$multi_packages" "APT plans one ROCm 10 package per normalized GFX" resolve_plan_artifacts apt "$multi_gfxes"
 assert_command_output_eq "$ROCM_RUNFILE_URL" "Runfile plans the pinned official installer" resolve_plan_artifacts runfile "$multi_gfxes"
 assert_fails "removed pip method has no artifacts" resolve_plan_artifacts pip gfx1201
