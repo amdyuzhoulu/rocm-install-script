@@ -276,14 +276,14 @@ AMDGPU_DKMS_PACKAGE_VERSION=$real_dkms_package_version
 AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION=$real_dkms_firmware_version
 AMDGPU_DKMS_STATUS=$real_dkms_status
 KERNEL_VERSION=6.8.0-138-generic
-assert_success "real AMDGPU 31.50 package and DKMS metadata is clean" amdgpu_dkms_is_clean_3140
+assert_success "real AMDGPU 31.50 package and DKMS metadata is clean" amdgpu_dkms_is_clean_current
 AMDGPU_DKMS_STATUS='amdgpu/6.19.18-2364437.24.04, 7.0.0-28-generic, x86_64: installed'
-assert_fails "AMDGPU 31.50 without the running-kernel module is not clean" amdgpu_dkms_is_clean_3140
+assert_fails "AMDGPU 31.50 without the running-kernel module is not clean" amdgpu_dkms_is_clean_current
 AMDGPU_DKMS_STATUS=$real_dkms_status
 AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION='1:31.40.0.0.31400000-older.24.04'
-assert_fails "AMDGPU 31.50 with mismatched firmware is not clean" amdgpu_dkms_is_clean_3140
+assert_fails "AMDGPU 31.50 with mismatched firmware is not clean" amdgpu_dkms_is_clean_current
 AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION='1:31x50.0.0.31500000-2364437.24.04'
-assert_fails "malformed AMDGPU firmware release text is not accepted as 31.50" amdgpu_dkms_is_clean_3140
+assert_fails "malformed AMDGPU firmware release text is not accepted as 31.50" amdgpu_dkms_is_clean_current
 AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION=$real_dkms_firmware_version
 
 runtime_pci_root="${TEST_TEMP_ROOT}/runtime-pci"
@@ -326,14 +326,14 @@ MOCK_DKMS_STATUS=$real_dkms_status
 DKMS_CLEANUP_POLICY=never
 NON_INTERACTIVE=true
 REBOOT_REQUIRED=false
-assert_success "a clean active AMDGPU 31.40 installation is left unchanged" migrate_driver
+assert_success "a clean active AMDGPU 31.50 installation is left unchanged" migrate_driver
 assert_eq false "$REBOOT_REQUIRED" "active AMDGPU DKMS does not request reboot"
 assert_eq '' "$RECORDED_COMMANDS" "active AMDGPU DKMS performs no purge or install"
 
 AMDGPU_RUNTIME_MODULE_PATH_OVERRIDE='/lib/modules/6.8.0-138-generic/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko.zst'
 reset_test_state
 REBOOT_REQUIRED=false
-assert_success "clean but inactive AMDGPU 31.40 waits for activation without reinstall" migrate_driver
+assert_success "clean but inactive AMDGPU 31.50 waits for activation without reinstall" migrate_driver
 assert_eq true "$REBOOT_REQUIRED" "inactive AMDGPU DKMS requests one activation reboot"
 assert_eq '' "$RECORDED_COMMANDS" "inactive clean AMDGPU DKMS is not purged or reinstalled"
 AMDGPU_RUNTIME_MODULE_PATH_OVERRIDE='/lib/modules/6.8.0-138-generic/updates/dkms/amdgpu.ko.zst'
@@ -346,7 +346,7 @@ DKMS_CLEANUP_POLICY=never
 NON_INTERACTIVE=true
 INSTALL_PLAN=([gfxes]=gfx1200 [driver_mode]=dkms [os_key]=ubuntu-24.04.4)
 REBOOT_REQUIRED=false
-assert_success "a clean real AMDGPU 31.40 installation is left unchanged" migrate_driver
+assert_success "a clean real AMDGPU 31.50 installation is left unchanged" migrate_driver
 assert_eq '' "$RECORDED_COMMANDS" "a clean AMDGPU 31.40 rerun performs no purge or install"
 
 assert_eq ready "$(resolve_driver_status dkms)" "clean active DKMS resolves ready"
@@ -408,9 +408,9 @@ MOCK_DKMS_STATUS='amdgpu/31.30.1, 6.8.0, x86_64: installed'
 DKMS_CLEANUP_POLICY=always
 NON_INTERACTIVE=true
 INSTALL_PLAN=([driver_mode]=dkms [os_key]=ubuntu-24.04.4)
-assert_success "DKMS mode migrates to AMDGPU 31.40" migrate_driver
+assert_success "DKMS mode migrates to AMDGPU 31.50" migrate_driver
 assert_contains "$RECORDED_COMMANDS" "dpkg --purge amdgpu-dkms" "DKMS purges conflicting old state before repository setup"
-assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdgpu-dkms" "DKMS installs AMDGPU 31.40"
+assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdgpu-dkms" "DKMS installs AMDGPU 31.50"
 
 assert_eq radeon "$(resolve_gpu_classes gfx1200)" "gfx1200 resolves to the Radeon policy class"
 assert_eq ryzen "$(resolve_gpu_classes gfx1151)" "gfx1151 resolves to the Ryzen policy class"

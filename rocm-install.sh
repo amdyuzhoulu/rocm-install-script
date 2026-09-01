@@ -1355,7 +1355,7 @@ detect_existing_amdgpu_dkms() {
     [[ -n "$AMDGPU_DKMS_PACKAGE_VERSION" || -n "$AMDGPU_DKMS_FIRMWARE_PACKAGE_VERSION" || -n "$AMDGPU_DKMS_STATUS" ]]
 }
 
-amdgpu_dkms_is_clean_3140() {
+amdgpu_dkms_is_clean_current() {
     local package_version firmware_version package_pattern firmware_pattern
     local driver_base build_suffix expected_module_version line module_field kernel_field status_field
     local status_count=0 running_kernel_found=false
@@ -1503,7 +1503,7 @@ resolve_driver_status() {
         dkms)
             if [[ $detection_status -eq 1 ]]; then
                 printf '%s\n' install-required
-            elif ! amdgpu_dkms_is_clean_3140; then
+            elif ! amdgpu_dkms_is_clean_current; then
                 printf '%s\n' migration-required
             elif amdgpu_dkms_runtime_is_active "$gfxes"; then
                 printf '%s\n' ready
@@ -1520,7 +1520,7 @@ resolve_install_actions() {
     [[ $# -eq 3 ]] || return 1
     case "$kernel_status" in ready|ready-unqualified|install-required|reboot-required) ;; *) return 1 ;; esac
     case "$driver_status" in ready|install-required|migration-required|reboot-required|runtime-failed) ;; *) return 1 ;; esac
-    case "$method" in apt|pip|tarball|runfile) ;; *) return 1 ;; esac
+    case "$method" in apt|runfile) ;; *) return 1 ;; esac
     if [[ "$kernel_status" != ready && "$kernel_status" != ready-unqualified ]]; then
         printf 'kernel:%s\n' "$kernel_status"
         return 0
@@ -1589,7 +1589,7 @@ configure_amdgpu_3140_repository() {
     run_cmd apt-get update
 }
 
-install_amdgpu_3140() {
+install_amdgpu_current() {
     run_cmd apt-get install --yes amdgpu-dkms
 }
 
@@ -1617,7 +1617,7 @@ migrate_driver() {
             fi
             ;;
         dkms)
-            if [[ $detection_status -eq 0 ]] && amdgpu_dkms_is_clean_3140; then
+            if [[ $detection_status -eq 0 ]] && amdgpu_dkms_is_clean_current; then
                 if amdgpu_dkms_runtime_is_active; then
                     return 0
                 fi
@@ -1627,9 +1627,9 @@ migrate_driver() {
             fi
             [[ $detection_status -eq 1 ]] || remove_existing_amdgpu_dkms || return $?
             configure_amdgpu_3140_repository || return $?
-            install_amdgpu_3140 || return $?
+            install_amdgpu_current || return $?
             detect_existing_amdgpu_dkms || return $?
-            amdgpu_dkms_is_clean_3140 || return 1
+            amdgpu_dkms_is_clean_current || return 1
             REBOOT_REQUIRED=true
             DRIVER_ACTIVATION_REQUIRED=true
             ;;
@@ -1945,10 +1945,6 @@ do_uninstall() {
     return "$failure_status"
 }
 
-handle_reboot() {
-    printf '%s\n' 'Automatic reboot is disabled; reboot manually if driver activation requires it.' >&2
-    return 1
-}
 
 confirm_install_plan() {
     local answer
