@@ -44,6 +44,7 @@ amdrocm-core-sdk10.0-gfx1201
 ```
 
 The ROCm binaries are exposed from `/opt/rocm/core-10.0`. Existing package-manager ROCm conflicts are handled only through the installer's explicit cleanup policy.
+Before installing the SDK, the APT path removes the exact legacy Ubuntu `libamdhip64-dev` package when present because its `/usr/include/hip` headers shadow the ROCm 10 headers. It also ensures the highest installed GCC has matching `g++-<version>` standard-library headers so ROCm Clang does not select an incomplete host toolchain.
 
 ### Runfile
 

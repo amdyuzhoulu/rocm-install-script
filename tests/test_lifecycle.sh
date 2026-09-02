@@ -127,11 +127,19 @@ printf 'ID=ubuntu\nVERSION_ID="26.04"\n' > "$os_release_fixture"
 assert_fails "non-x86_64 architecture is rejected" detect_system
 unset OS_RELEASE_FILE SYSTEM_ARCH_OVERRIDE SYSTEM_KERNEL_OVERRIDE
 
+GCC_INSTALL_ROOT="${TEST_TEMP_ROOT}/gcc-install"
+CXX_INCLUDE_ROOT="${TEST_TEMP_ROOT}/cxx-include"
+mkdir -p "${GCC_INSTALL_ROOT}/13" "${GCC_INSTALL_ROOT}/14" "${CXX_INCLUDE_ROOT}/13"
+printf 'header\n' > "${CXX_INCLUDE_ROOT}/13/cmath"
+assert_eq g++-14 "$(missing_gxx_package_for_highest_gcc)" "highest GCC without matching C++ headers selects its g++ package"
+
 reset_lifecycle_state
 assert_success "APT prerequisites install required and retained optional tools" step_prerequisites
 assert_contains "$RECORDED_COMMANDS" "apt-get update" "prerequisites refresh APT metadata"
 assert_contains "$RECORDED_COMMANDS" "curl ca-certificates gnupg pciutils" "required fetch, key, and detection tools are installed"
 assert_contains "$RECORDED_COMMANDS" "build-essential cmake git" "retained development tools are attempted"
+assert_contains "$RECORDED_COMMANDS" "g++-14" "prerequisites install C++ headers matching the highest installed GCC"
+unset GCC_INSTALL_ROOT CXX_INCLUDE_ROOT
 assert_contains "$RECORDED_COMMANDS" "systemctl enable --now systemd-timesyncd" "time synchronization is enabled"
 
 reset_lifecycle_state
@@ -384,11 +392,11 @@ recorded_command_count() {
 MOCK_DKMS_PACKAGE_VERSION=""
 MOCK_DKMS_STATUS=""
 MOCK_KERNEL_VERSION=7.0.0-generic
-MOCK_INSTALLED_LEGACY_ROCM_PACKAGES="rocm-dev rocm amdrocm-core-sdk10.0-gfx1151"
+MOCK_INSTALLED_LEGACY_ROCM_PACKAGES="rocm-dev rocm libamdhip64-dev amdrocm-core-sdk10.0-gfx1151"
 assert_success "mocked inbox APT lifecycle runs through the real steps" run_mocked_main apt --gpu-arch gfx1151
-assert_contains "$RECORDED_COMMANDS" "apt-get purge --yes rocm rocm-dev" "main flow purges only the installed legacy ROCm packages"
+assert_contains "$RECORDED_COMMANDS" "apt-get purge --yes libamdhip64-dev rocm rocm-dev" "main flow purges ROCm meta packages and the conflicting distro HIP headers"
 assert_not_contains "$RECORDED_COMMANDS" "apt-get purge --yes amdrocm" "main flow keeps amdrocm packages out of legacy migration purges"
-assert_command_before "apt-get purge --yes rocm rocm-dev" "apt-get install --yes amdrocm-core-sdk10.0-gfx1151" "$RECORDED_COMMANDS" "main flow purges legacy ROCm before installing the current package"
+assert_command_before "apt-get purge --yes libamdhip64-dev rocm rocm-dev" "apt-get install --yes amdrocm-core-sdk10.0-gfx1151" "$RECORDED_COMMANDS" "main flow purges legacy ROCm before installing the current package"
 assert_contains "$RECORDED_COMMANDS" "apt-get install --yes amdrocm-core-sdk10.0-gfx1151" "main flow installs the architecture-specific APT package"
 assert_not_contains "$RECORDED_COMMANDS" "apt-get install --yes amdgpu-dkms" "auto driver mode keeps the inbox driver"
 

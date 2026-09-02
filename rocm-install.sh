@@ -1636,13 +1636,35 @@ migrate_driver() {
     esac
 }
 
+missing_gxx_package_for_highest_gcc() {
+    local gcc_root=${GCC_INSTALL_ROOT:-/usr/lib/gcc/x86_64-linux-gnu}
+    local cxx_root=${CXX_INCLUDE_ROOT:-/usr/include/c++}
+    local directory version highest=''
+
+    [[ -d "$gcc_root" && -d "$cxx_root" ]] || return 1
+    for directory in "$gcc_root"/[0-9]*; do
+        [[ -d "$directory" ]] || continue
+        version=${directory##*/}
+        [[ "$version" =~ ^[0-9]+$ ]] || continue
+        if [[ -z "$highest" ]] || ((10#$version > 10#$highest)); then
+            highest=$version
+        fi
+    done
+    [[ -n "$highest" && ! -f "${cxx_root}/${highest}/cmath" ]] || return 1
+    printf 'g++-%s\n' "$highest"
+}
+
 step_prerequisites() {
+    local missing_gxx_package
     local -a required_packages=(curl ca-certificates gnupg pciutils systemd-timesyncd)
     local -a optional_packages=(
         build-essential cmake git python3 python3-pip python3-setuptools python3-wheel
         vim htop tmux screen net-tools nfs-common rsync usbutils lshw dmidecode
         sysstat iotop unzip zip p7zip-full jq libnuma-dev
     )
+    if missing_gxx_package=$(missing_gxx_package_for_highest_gcc); then
+        required_packages+=("$missing_gxx_package")
+    fi
 
     case "${INSTALL_PLAN[method]:-${INSTALL_METHOD:-}}" in
         apt|runfile) ;;
@@ -1754,7 +1776,7 @@ detect_legacy_rocm_packages() {
 
     query_output=$(dpkg-query -W -f='${binary:Package}\t${db:Status-Status}\n' 2>/dev/null) || return $?
     while IFS=$'\t' read -r package package_status; do
-        [[ "$package_status" == installed && "$package" =~ ^rocm($|-) ]] || continue
+        [[ "$package_status" == installed && ( "$package" =~ ^rocm($|-) || "$package" == libamdhip64-dev ) ]] || continue
         printf '%s\n' "$package"
     done <<< "$query_output" | LC_ALL=C sort -u
 }
