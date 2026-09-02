@@ -1641,7 +1641,7 @@ missing_gxx_package_for_highest_gcc() {
     local cxx_root=${CXX_INCLUDE_ROOT:-/usr/include/c++}
     local directory version highest=''
 
-    [[ -d "$gcc_root" && -d "$cxx_root" ]] || return 1
+    [[ -d "$gcc_root" ]] || return 1
     for directory in "$gcc_root"/[0-9]*; do
         [[ -d "$directory" ]] || continue
         version=${directory##*/}

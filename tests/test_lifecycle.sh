@@ -132,6 +132,10 @@ CXX_INCLUDE_ROOT="${TEST_TEMP_ROOT}/cxx-include"
 mkdir -p "${GCC_INSTALL_ROOT}/13" "${GCC_INSTALL_ROOT}/14" "${CXX_INCLUDE_ROOT}/13"
 printf 'header\n' > "${CXX_INCLUDE_ROOT}/13/cmath"
 assert_eq g++-14 "$(missing_gxx_package_for_highest_gcc)" "highest GCC without matching C++ headers selects its g++ package"
+rm -rf "$CXX_INCLUDE_ROOT"
+assert_eq g++-14 "$(missing_gxx_package_for_highest_gcc)" "missing C++ include root still selects headers for the highest GCC"
+mkdir -p "${CXX_INCLUDE_ROOT}/13"
+printf 'header\n' > "${CXX_INCLUDE_ROOT}/13/cmath"
 
 reset_lifecycle_state
 assert_success "APT prerequisites install required and retained optional tools" step_prerequisites
